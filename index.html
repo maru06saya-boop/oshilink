@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>推しLink｜あなたが知ってる推しの魅力。</title>
+<style>
+:root{--bg:#21171b;--panel:#302126;--panel2:#3b2930;--pink:#e99ab9;--hot:#ff70b5;--lav:#c8a8ef;--white:#fff8fb;--muted:#cbbbc2}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% 0%,#50303e 0,transparent 35%),linear-gradient(135deg,#1c171b,#302027 60%,#1d171b);color:var(--white);font-family:system-ui,-apple-system,"Noto Sans JP",sans-serif}
+header{position:sticky;top:0;z-index:5;background:#21171beF;border-bottom:1px solid #805267;padding:14px max(18px,calc((100% - 1100px)/2));display:flex;align-items:center;gap:24px;backdrop-filter:blur(12px)}
+.logo{font-weight:900;font-size:27px;letter-spacing:.03em;background:linear-gradient(90deg,#ff8fc4,#c6a4ff);color:transparent;background-clip:text;text-shadow:0 0 22px #ff70b566;white-space:nowrap}
+nav{display:flex;gap:10px;margin-left:auto;align-items:center}button,.btn{border:1px solid #a96d87;background:#4a2d3a;color:white;border-radius:999px;padding:10px 17px;font-weight:700;cursor:pointer;text-decoration:none}button.primary,.primary{background:linear-gradient(100deg,#e879aa,#a77de0);border:0;color:#251720;box-shadow:0 5px 22px #e879aa44}
+main{max-width:1100px;margin:auto;padding:34px 18px 70px}.hero{text-align:center;padding:50px 15px 35px}.eyebrow{color:#f2a5c7;letter-spacing:.18em;font-size:12px;font-weight:800}.hero h1{font-size:clamp(29px,5vw,48px);margin:12px 0;background:linear-gradient(90deg,#fff,#ffadd0,#c9adff);color:transparent;background-clip:text}.hero p{color:var(--muted);line-height:1.9}
+.searchbar{display:flex;gap:9px;max-width:650px;margin:24px auto}.searchbar input{flex:1}.panel{background:linear-gradient(145deg,#39262fdd,#261d22);border:1px solid #87566d;border-radius:22px;padding:22px;box-shadow:0 14px 40px #0003}
+input,select,textarea{width:100%;padding:12px 14px;border-radius:12px;border:1px solid #795366;background:#21191e;color:white;font:inherit;margin:6px 0 14px}label{font-size:13px;color:#f0c5d7;font-weight:700}textarea{min-height:85px;resize:vertical}.section-title{display:flex;justify-content:space-between;align-items:center;margin:28px 0 14px}.section-title h2{font-size:21px;margin:0}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:15px}.oshi-card{background:#302129;border:1px solid #70495c;border-radius:18px;padding:16px;cursor:pointer;transition:.2s}.oshi-card:hover{transform:translateY(-3px);border-color:var(--hot)}.avatar{width:76px;height:76px;border-radius:50%;object-fit:cover;background:#5a3a4a;border:2px solid #e89abd}.card-top{display:flex;gap:13px;align-items:center}.muted{color:var(--muted);font-size:13px}.tag{display:inline-block;border:1px solid #9b6681;color:#f2b6d0;border-radius:999px;padding:4px 9px;font-size:11px;margin:3px}
+.hidden{display:none!important}.modal{position:fixed;inset:0;background:#000a;z-index:10;display:grid;place-items:center;padding:15px;overflow:auto}.modal-inner{width:min(650px,100%);max-height:92vh;overflow:auto}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:15px}.profile-head{display:flex;gap:18px;align-items:center}.profile-head .avatar{width:105px;height:105px}.sheet{background:linear-gradient(135deg,#3c2732,#211a22);border:2px solid #e59aba;border-radius:20px;padding:25px;text-align:center}.sheet h2{font-size:30px;color:#ffafd0}.footer{text-align:center;color:#a9949e;padding:30px;font-size:12px}
+@media(max-width:600px){header{gap:10px;flex-wrap:wrap}.logo{font-size:23px}nav{width:100%;margin:0}nav button{flex:1;padding:9px 8px;font-size:12px}.hero{padding-top:30px}.searchbar{flex-direction:column}.profile-head{align-items:flex-start}}
+</style>
+</head>
+<body>
+<header><div class="logo" onclick="showHome()" style="cursor:pointer">推しLink</div><nav><button class="primary" onclick="openEditor()">プロフを作る</button><button onclick="showHome()">推しを探す</button><button onclick="alert('推しLink｜あなたが知ってる推しの魅力。')">MENU</button></nav></header>
+<main>
+<section id="home">
+<div class="hero"><div class="eyebrow">OSHILINK</div><h1>あなたが知ってる推しの魅力。</h1><p>好きなところを、あなたの言葉で。<br>まだ知らない誰かに、推しの魅力を届けよう。</p>
+<div class="searchbar"><input id="search" placeholder="推しの名前・ジャンルで検索" oninput="renderCards()"><button class="primary" onclick="renderCards()">検索</button></div>
+<button class="primary" onclick="openEditor()">＋ 推しプロフィールを作る</button></div>
+<div class="section-title"><h2>みんなの推しプロフィール</h2><span class="muted" id="count"></span></div><div id="cards" class="grid"></div>
+</section>
+<section id="detail" class="hidden"><button onclick="showHome()">← 一覧へ戻る</button><div id="detailContent" class="panel" style="margin-top:16px"></div></section>
+</main>
+<div id="editor" class="modal hidden"><div class="modal-inner panel"><div class="section-title"><h2 id="editorTitle">プロフィールを作る</h2><button onclick="closeEditor()">閉じる</button></div>
+<form id="profileForm" onsubmit="saveProfile(event)">
+<input type="hidden" id="editId">
+<label>プロフィール画像</label><input type="file" id="image" accept="image/*"><img id="preview" class="avatar hidden" alt="画像プレビュー">
+<label>名前・活動名 *</label><input id="name" required placeholder="例：〇〇">
+<label>読み方</label><input id="reading" placeholder="例：おし れん">
+<label>活動ジャンル</label><select id="genre"><option>アイドル</option><option>歌手・アーティスト</option><option>俳優・タレント</option><option>YouTuber・配信者</option><option>声優</option><option>アニメ・ゲームキャラクター</option><option>スポーツ</option><option>その他</option></select>
+<label>生年月日</label><input type="date" id="birthday" onchange="updateZodiac()"><p class="muted" id="zodiac"></p>
+<label>血液型</label><select id="blood"><option value="">選択しない</option><option>A型</option><option>B型</option><option>O型</option><option>AB型</option><option>非公表</option><option>不明</option></select>
+<label>出身地</label><input id="origin" placeholder="例：東京都">
+<label>公式サイト・SNSなど</label><input id="official" type="url" placeholder="https://">
+<label>推しポイント（好きなところ）</label><textarea id="points" placeholder="歌声、笑顔、パフォーマンスなど"></textarea>
+<label>好きな曲 BEST 1</label><input id="song1" placeholder="曲名・アーティスト">
+<label>好きな曲 BEST 2</label><input id="song2" placeholder="曲名・アーティスト">
+<label>布教コメント</label><textarea id="comment" placeholder="初めて知る人に伝えたい魅力"></textarea>
+<div class="actions"><button class="primary" type="submit">保存する</button><button type="button" onclick="closeEditor()">キャンセル</button></div>
+</form></div></div>
+<div class="footer">推しLink　#推しリンク<br>※この試作品のデータは、現在使用しているブラウザ内に保存されます。</div>
+<script>
+const KEY='oshilink_demo_profiles';
+let profiles=JSON.parse(localStorage.getItem(KEY)||'[]'), imageData='';
+const $=id=>document.getElementById(id);
+function persist(){localStorage.setItem(KEY,JSON.stringify(profiles))}
+function zodiac(date){if(!date)return '';let d=new Date(date+'T00:00:00'),m=d.getMonth()+1,day=d.getDate();let ranges=[[1,20,'山羊座'],[2,19,'水瓶座'],[3,21,'魚座'],[4,20,'牡羊座'],[5,21,'牡牛座'],[6,22,'双子座'],[7,23,'蟹座'],[8,23,'獅子座'],[9,23,'乙女座'],[10,24,'天秤座'],[11,23,'蠍座'],[12,22,'射手座']];let names=['射手座','山羊座','水瓶座','魚座','牡羊座','牡牛座','双子座','蟹座','獅子座','乙女座','天秤座','蠍座'];let idx=m-1;for(let i=0;i<ranges.length;i++){let [rm,rd,n]=ranges[i];if(m>rm||(m===rm&&day>=rd)){}else{idx=i-1;break}}if(idx<0)idx=11;return names[idx]}
+function updateZodiac(){$('zodiac').textContent=$('birthday').value?'星座：'+zodiac($('birthday').value):''}
+$('image').addEventListener('change',e=>{let f=e.target.files[0];if(!f)return;let reader=new FileReader();reader.onload=()=>{imageData=reader.result;$('preview').src=imageData;$('preview').classList.remove('hidden')};reader.readAsDataURL(f)});
+function renderCards(){let q=$('search').value.trim().toLowerCase(),list=profiles.filter(p=>(p.name+' '+p.genre+' '+p.points).toLowerCase().includes(q));$('count').textContent=list.length+'件';$('cards').innerHTML=list.length?list.map(p=>`<article class="oshi-card" onclick="showDetail('${p.id}')"><div class="card-top"><img class="avatar" src="${p.image||''}" alt=""><div><b>${esc(p.name)}</b><div class="muted">${esc(p.genre||'')}</div><div class="muted">${esc(p.zodiac||'')}</div></div></div><p>${esc(p.points||p.comment||'')}</p></article>`).join(''):'<p class="muted">まだプロフィールがありません。最初の推しプロフィールを作ってみましょう。</p>'}
+function esc(s=''){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function openEditor(id){$('profileForm').reset();imageData='';$('preview').classList.add('hidden');$('editId').value='';$('editorTitle').textContent='プロフィールを作る';if(id){let p=profiles.find(x=>x.id===id);if(!p)return;$('editorTitle').textContent='プロフィールを編集';$('editId').value=p.id;['name','reading','genre','birthday','blood','origin','official','points','song1','song2','comment'].forEach(k=>$(k).value=p[k]||'');imageData=p.image||'';if(imageData){$('preview').src=imageData;$('preview').classList.remove('hidden')}updateZodiac()}$('editor').classList.remove('hidden')}
+function closeEditor(){$('editor').classList.add('hidden')}
+function saveProfile(e){e.preventDefault();let id=$('editId').value||crypto.randomUUID();let p={id,image:imageData,name:$('name').value,reading:$('reading').value,genre:$('genre').value,birthday:$('birthday').value,zodiac:zodiac($('birthday').value),blood:$('blood').value,origin:$('origin').value,official:$('official').value,points:$('points').value,song1:$('song1').value,song2:$('song2').value,comment:$('comment').value};let i=profiles.findIndex(x=>x.id===id);if(i>=0)profiles[i]=p;else profiles.unshift(p);persist();closeEditor();showHome();renderCards()}
+function showHome(){$('home').classList.remove('hidden');$('detail').classList.add('hidden');renderCards()}
+function showDetail(id){let p=profiles.find(x=>x.id===id);if(!p)return;$('home').classList.add('hidden');$('detail').classList.remove('hidden');$('detailContent').innerHTML=`<div class="profile-head"><img class="avatar" src="${p.image||''}" alt=""><div><h1>${esc(p.name)}</h1><p class="muted">${esc(p.reading)}　${esc(p.genre)}</p></div></div><hr style="border-color:#684354;margin:22px 0"><p><b>生年月日・星座：</b>${esc(p.birthday||'未登録')} ${esc(p.zodiac)}</p><p><b>血液型：</b>${esc(p.blood||'未登録')}　<b>出身地：</b>${esc(p.origin||'未登録')}</p><h3>推しポイント</h3><p>${esc(p.points||'')}</p><h3>好きな曲 BEST 2</h3><p>01　${esc(p.song1||'未登録')}<br>02　${esc(p.song2||'未登録')}</p><h3>布教コメント</h3><p>${esc(p.comment||'')}</p>${p.official?`<p><a style="color:#ffacd0" target="_blank" rel="noopener" href="${esc(p.official)}">公式サイト・SNSを見る ↗</a></p>`:''}<div class="actions"><button class="primary" onclick="downloadSheet('${p.id}')">布教シートを画像保存</button><button onclick="openEditor('${p.id}')">編集</button><button onclick="deleteProfile('${p.id}')">削除</button></div>`}
+function deleteProfile(id){if(confirm('このプロフィールを削除しますか？')){profiles=profiles.filter(p=>p.id!==id);persist();showHome()}}
+function downloadSheet(id){let p=profiles.find(x=>x.id===id);if(!p)return;let c=document.createElement('canvas');c.width=1080;c.height=1080;let x=c.getContext('2d'),g=x.createLinearGradient(0,0,1080,1080);g.addColorStop(0,'#4a2c3b');g.addColorStop(1,'#201920');x.fillStyle=g;x.fillRect(0,0,1080,1080);x.strokeStyle='#ef9fc3';x.lineWidth=12;x.strokeRect(35,35,1010,1010);x.textAlign='center';x.fillStyle='#ffb4d2';x.font='bold 64px sans-serif';x.fillText('推しLink',540,135);x.fillStyle='#fff7fb';x.font='bold 74px sans-serif';x.fillText(p.name,540,265);x.fillStyle='#e9c8d8';x.font='38px sans-serif';x.fillText(p.genre+'　'+(p.zodiac||''),540,335);x.font='42px sans-serif';wrapText(x,p.points||p.comment||'あなたが知ってる推しの魅力。',540,470,850,62);x.fillStyle='#ffb4d2';x.font='bold 34px sans-serif';x.fillText('好きな曲',540,760);x.fillStyle='#fff';x.font='30px sans-serif';x.fillText((p.song1||'')+'　／　'+(p.song2||''),540,820);x.fillStyle='#e9c8d8';x.font='28px sans-serif';x.fillText('#推しリンク',540,960);let a=document.createElement('a');a.download='oshilink-'+p.name+'.png';a.href=c.toDataURL('image/png');a.click()}
+function wrapText(ctx,text,x,y,maxWidth,lineHeight){let words=String(text).split('');let line='';for(let ch of words){let test=line+ch;if(ctx.measureText(test).width>maxWidth&&line){ctx.fillText(line,x,y);line=ch;y+=lineHeight}else line=test}if(line)ctx.fillText(line,x,y)}
+renderCards();
+</script>
+</body></html>
