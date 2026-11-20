@@ -274,6 +274,9 @@
   .search-detail-tags{display:flex; flex-wrap:wrap; gap:6px; margin-top:10px}
   .search-detail-tags span{font-size:11.5px; font-weight:900; color:var(--pink); background:var(--pink-soft); border:1px solid var(--border-soft); border-radius:999px; padding:3px 10px}
   .search-note{margin:12px 0 0; font-size:11.5px; color:var(--faint); line-height:1.7}
+  /* search result -> profile page: actions under the full-page preview */
+  .search-profile-actions{margin-top:14px}
+  .search-profile-actions .mypage-item-actions{margin-top:0}
   .search-freeword{background:var(--surface-2); border:1.5px solid var(--border); border-radius:14px; padding:14px}
   .search-freeword label{font-size:13.5px}
   .search-freeword input[type="text"]{background:#fff !important; font-size:16px !important}
@@ -1693,7 +1696,7 @@
     <button type="button" class="mypage-toggle" data-mp-toggle="sheets" aria-expanded="false" aria-controls="mypageSheetsBody">
       <span class="mypage-toggle-main">
         <span class="mypage-toggle-title">布教シートの管理</span>
-        <span class="mypage-toggle-desc">保存された布教シート（共有ページ）の内容です。共有ページへ進んで確認・共有できます。</span>
+        <span class="mypage-toggle-desc">保存された布教シート（共有ページ）の内容です。共有ページへ進んで確認・共有したり、削除したりできます。</span>
       </span>
       <span class="mypage-toggle-side"><span class="mypage-count" id="mypageSheetsCount" hidden></span><span class="mypage-chevron" aria-hidden="true">›</span></span>
     </button>
@@ -1835,7 +1838,6 @@
     </div>
     <p class="search-active" id="searchActiveText" hidden></p>
     <div id="searchResults"></div>
-    <div id="searchDetail"></div>
   </section>
 
   <!-- 広告枠（検索結果ページの下） -->
@@ -1845,6 +1847,15 @@
       <p class="ad-slot-ph">広告</p>
     </div>
   </section>
+</div>
+
+<div class="sub-wrap" id="searchProfileView" hidden>
+  <div class="ed-top">
+    <button type="button" class="btn-back" id="btnBackToResults">← もどる</button>
+    <h1 id="searchProfileTitle">推しプロフィール</h1>
+  </div>
+  <div class="pv" id="searchPvRoot"></div>
+  <div class="search-profile-actions" id="searchProfileActions"></div>
 </div>
 
 <div class="sub-wrap" id="termsView" hidden>
@@ -5076,7 +5087,7 @@
   if($("btnLoginMypage")) $("btnLoginMypage").addEventListener("click", function(){ pendingAuthAction = null; pendingAuthLabel = ""; showAuthView("login"); });
 
   function hideSubViews(){
-    ["mypageView", "searchView", "searchResultsView", "termsView", "newsView", "faqView", "premiumView", "adsView", "privacyView", "contactView", "tokushoView", "authView"].forEach(function(id){
+    ["mypageView", "searchView", "searchResultsView", "searchProfileView", "termsView", "newsView", "faqView", "premiumView", "adsView", "privacyView", "contactView", "tokushoView", "authView"].forEach(function(id){
       var el = $(id);
       if(el) el.hidden = true;
     });
@@ -5133,10 +5144,22 @@
     } catch(e){ /* localStorage unavailable: editing keeps working unsaved */ }
   }
   function readProfiles(){
-    var arr = readStoredJson(PROFILES_STORAGE_KEY);
-    if(Array.isArray(arr)){
-      var valid = arr.filter(function(en){ return en && typeof en === "object" && en.data && typeof en.data === "object"; });
-      if(valid.length) return valid;
+    /* The v2 list is authoritative once its key exists — even when
+       it holds an empty array. Falling back to the legacy key
+       whenever the list comes back empty would resurrect the last
+       deleted profile: deleting the only saved person writes "[]"
+       here, and the legacy single-profile copy (kept only for
+       compatibility) must not be migrated back in after that. The
+       legacy key is consulted only when the v2 key has never been
+       written (a genuine first-run migration). */
+    var rawV2 = null;
+    var v2Exists = false;
+    try { rawV2 = window.localStorage.getItem(PROFILES_STORAGE_KEY); v2Exists = rawV2 !== null; } catch(e){}
+    if(v2Exists){
+      var arr = null;
+      try { arr = JSON.parse(rawV2); } catch(e){}
+      if(!Array.isArray(arr)) return [];
+      return arr.filter(function(en){ return en && typeof en === "object" && en.data && typeof en.data === "object"; });
     }
     var legacy = (typeof PROFILE_STORAGE_KEY !== "undefined") ? readStoredJson(PROFILE_STORAGE_KEY) : null;
     if(legacy && typeof legacy === "object" && (legacy.fields || legacy.profileImg)){
@@ -5169,28 +5192,77 @@
   }
   function deleteProfileById(id){
     if(!id) return;
-    var arr = readProfiles().filter(function(en){ return en.id !== id; });
+    var before = readProfiles();
+    var deletedEntry = null;
+    before.forEach(function(en){ if(en.id === id) deletedEntry = en; });
+    var arr = before.filter(function(en){ return en.id !== id; });
     writeProfiles(arr);
     var map = readStoredJson(SHARES_MAP_KEY);
+    var deletedShare = (map && typeof map === "object") ? map[id] : null;
     if(map && typeof map === "object" && map[id]){
       delete map[id];
       try { window.localStorage.setItem(SHARES_MAP_KEY, JSON.stringify(map)); } catch(e){}
     }
     if(selectedProfileId === id) selectedProfileId = null;
     if(selectedSheetId === id) selectedSheetId = null;
+    /* The legacy single-profile key must ALWAYS be re-synced with
+       what remains (or removed when nothing remains). It used to be
+       updated only when the deleted person happened to be open in
+       the editor, so a deletion from マイページ left the old copy
+       behind and the profile reappeared on the next render even
+       though 「削除しました」 was shown. */
+    try {
+      var legacyData = arr.length ? arr[arr.length - 1].data : null;
+      if(legacyData) window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(legacyData));
+      else window.localStorage.removeItem(PROFILE_STORAGE_KEY);
+    } catch(e){}
+    /* Same for the legacy single-sheet key: when it holds the
+       deleted person's sheet, replace it with a remaining person's
+       sheet or remove it, so the deleted sheet does not come back
+       as a "sheet only" entry once no profiles are left. A legacy
+       sheet belonging to someone else (a different name) is kept. */
+    try {
+      if(typeof SHARE_STORAGE_KEY !== "undefined"){
+        var legacyShare = readStoredJson(SHARE_STORAGE_KEY);
+        if(legacyShare && typeof legacyShare === "object"){
+          var lsName = legacyShare.fields ? String(legacyShare.fields["sp-name"] || "").trim() : "";
+          var dsName = deletedShare && deletedShare.fields ? String(deletedShare.fields["sp-name"] || "").trim() : "";
+          var dpName = deletedEntry ? entryName(deletedEntry.data) : "";
+          var belongsToDeleted = (deletedShare && JSON.stringify(legacyShare) === JSON.stringify(deletedShare))
+            || (!!lsName && ((!!dsName && lsName === dsName) || (!!dpName && lsName === dpName)));
+          if(belongsToDeleted){
+            var lastShare = (arr.length && map && typeof map === "object") ? map[arr[arr.length - 1].id] : null;
+            if(lastShare) window.localStorage.setItem(SHARE_STORAGE_KEY, JSON.stringify(lastShare));
+            else window.localStorage.removeItem(SHARE_STORAGE_KEY);
+          }
+        }
+      }
+    } catch(e){}
+    /* A leftover editing draft for the deleted person must go too,
+       no matter who is currently open in the editor. */
+    var draft = (typeof readDraftData === "function") ? readDraftData() : null;
+    if(draft && draft.editingId === id && typeof clearDraft === "function") clearDraft();
     if(currentEditingId === id){
       currentEditingId = null;
       editorMode = null;
       resetEditorToBlank();
-      var draft = (typeof readDraftData === "function") ? readDraftData() : null;
-      if(draft && draft.editingId === id && typeof clearDraft === "function") clearDraft();
-      var rest = readProfiles();
-      var legacyData = rest.length ? rest[rest.length - 1].data : null;
-      try {
-        if(legacyData) window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(legacyData));
-        else window.localStorage.removeItem(PROFILE_STORAGE_KEY);
-      } catch(e){}
     }
+  }
+  /* 布教シートの管理's delete. A legacy sheet-only entry lives
+     solely under the legacy share key, so deleting it removes just
+     that key. A per-person sheet is saved together with (and its
+     preview derived from) that person's profile, so its panel's
+     deletion removes the person's saved entry — profile and sheet
+     together — via deleteProfileById; the confirmation copy in
+     sheetPanelHtml says exactly that before anything is deleted. */
+  function deleteSheetById(id){
+    if(!id) return;
+    if(id === "__legacy"){
+      try { if(typeof SHARE_STORAGE_KEY !== "undefined") window.localStorage.removeItem(SHARE_STORAGE_KEY); } catch(e){}
+      if(selectedSheetId === id) selectedSheetId = null;
+      return;
+    }
+    deleteProfileById(id);
   }
   function profileDesignLabel(design){
     return design === "simple" ? "シンプル" : design === "check" ? "チェック柄" : design === "site" ? "ダークカラー" : "";
@@ -5212,14 +5284,20 @@
       + '<span class="fav-card-name">' + esc(name || "名前未入力") + '</span></button>';
   }
   /* 布教シートの管理 list item: the detail panel itself — name,
-     design name and the 共有ページへ button on the left, the person's
-     edited sheet as a mini preview on the right. One panel per person,
-     listed directly (no thumbnail-only card, no tap-to-open step). */
+     design name and the 共有ページへ / 削除する buttons (with this
+     panel's own delete confirmation) on the left, the person's
+     edited sheet as a mini preview on the right. One panel per
+     person, listed directly (no thumbnail-only card, no
+     tap-to-open step). */
   function sheetPanelHtml(name, meta, points, openId, thumbData, vis){
+    var confirmText = openId === "__legacy"
+      ? "この布教シートを削除しますか？端末内の保存データが消えます。"
+      : "この布教シートを削除しますか？シートと、もとの推しプロフィールの保存データが一緒に消えます。";
     return '<div class="oshi-detail"><div class="oshi-detail-flex"><div class="oshi-detail-main"><div class="oshi-detail-head"><div class="oshi-detail-name">' + esc(name || "名前未入力") + '</div>' + visBadgeHtml(vis) + '</div>'
       + (meta && meta.length ? '<div class="oshi-detail-meta">' + meta.join(" ・ ") + '</div>' : '')
       + (points ? '<div class="oshi-detail-meta">' + esc(points) + '</div>' : '')
-      + '<div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-primary" data-mp-open-sheet="' + esc(openId) + '">共有ページへ</button></div></div>'
+      + '<div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-primary" data-mp-open-sheet="' + esc(openId) + '">共有ページへ</button><button type="button" class="mypage-btn" data-mp-delete-sheet="' + esc(openId) + '">削除する</button></div>'
+      + '<div class="mypage-confirm" data-mp-delete-sheet-confirm-box hidden><p>' + confirmText + '</p><div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-danger" data-mp-delete-sheet-confirm="' + esc(openId) + '">削除する</button><button type="button" class="mypage-btn" data-mp-delete-sheet-cancel>キャンセル</button></div></div></div>'
       + '<div class="oshi-sheet-preview">' + ogThumbHtml(thumbData) + '</div></div></div>';
   }
   /* 推しプロフィールの管理 list item: the detail panel itself —
@@ -5768,8 +5846,7 @@
     return true;
   }
   function searchCardHtml(p){
-    var selected = p.id === searchSelectedId;
-    return '<button type="button" class="fav-card' + (selected ? " selected" : "") + '" data-search-card data-search-id="' + esc(p.id) + '" aria-pressed="' + (selected ? "true" : "false") + '" aria-label="' + esc(p.name || "名前未入力") + '">'
+    return '<button type="button" class="fav-card" data-search-card data-search-id="' + esc(p.id) + '" aria-label="' + esc(p.name || "名前未入力") + 'のプロフィールを見る">'
       + '<span class="fav-card-photo">' + (p.img ? '<img src="' + p.img + '" alt="" />' : OSHI_PHOTO_PH) + '</span>'
       + '<span class="fav-card-name">' + esc(p.name || "名前未入力") + '</span></button>';
   }
@@ -5805,42 +5882,339 @@
     }
     if(!all.length){
       box.innerHTML = '<div class="mypage-empty"><p>保存されたプロフィールはまだありません</p><p class="mypage-empty-sub">プロフィールを作成して「保存する」を押すと、その推しが検索できるようになります。</p></div>';
-      if($("searchDetail")) $("searchDetail").innerHTML = "";
       return;
     }
     if(!results.length){
       box.innerHTML = '<div class="mypage-empty"><p>条件に合う推しが見つかりませんでした</p><p class="mypage-empty-sub">条件を1つ減らしたり、年だけ・月だけ・日だけのようにゆるめると見つかりやすくなります。</p></div>';
-      if($("searchDetail")) $("searchDetail").innerHTML = "";
       return;
     }
     var grid = "";
     results.forEach(function(p){ grid += searchCardHtml(p); });
     box.innerHTML = '<div class="fav-grid">' + grid + '</div>';
-    var detail = $("searchDetail");
-    if(detail){
-      var sel = null;
-      results.forEach(function(p){ if(p.id === searchSelectedId) sel = p; });
-      if(!sel){ detail.innerHTML = ""; }
-      else {
-        var meta = [];
-        if(sel.furigana) meta.push(esc(sel.furigana));
-        if(sel.genre) meta.push(esc(sel.genre));
-        if(sel.group) meta.push(esc(sel.group));
-        var lines = [];
-        if(sel.birthText) lines.push("誕生日：" + esc(sel.birthText));
-        if(sel.zodiac) lines.push("星座：" + esc(sel.zodiac));
-        if(sel.originDisplay) lines.push("出身地：" + esc(sel.originDisplay));
-        if(sel.colorName) lines.push("メンバーカラー：" + (sel.colorHex ? '<span class="color-dot" style="background:' + esc(sel.colorHex) + '"></span>' : "") + esc(sel.colorName));
-        var dh = '<div class="oshi-detail"><div class="oshi-detail-name">' + esc(sel.name || "名前未入力") + '</div>'
-          + (meta.length ? '<div class="oshi-detail-meta">' + meta.join(" ・ ") + '</div>' : '')
-          + (lines.length ? '<div class="oshi-detail-meta">' + lines.join(" ／ ") + '</div>' : '')
-          + (sel.pointsText ? '<div class="oshi-detail-meta">' + esc(sel.pointsText) + '</div>' : '')
-          + (sel.tags.length ? '<div class="search-detail-tags">' + sel.tags.map(function(t){ return "<span>#" + esc(t) + "</span>"; }).join("") + '</div>' : '')
-          + (sel.isLocal ? '<div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-primary" data-search-edit="' + esc(sel.id) + '">編集する</button></div>' : '')
-          + '</div>';
-        detail.innerHTML = dh;
+  }
+  /* ---------- 検索結果から開く推しプロフィールページ ----------
+     検索結果のカードをタップすると、その場（下）に詳細を出すの
+     ではなく、この専用ページへ画面遷移して、プロフィール作成
+     画面の完成プレビューと同じ見た目（.pv の各セクションと
+     デザイン／色テーマ）で、その推しのプロフィールを1ページ
+     まるごと表示する。「もどる」で検索結果ページに戻れる
+     （結果一覧・絞り込み条件はそのまま残る）。 */
+  var searchProfileName = "";
+  /* 完成プレビューの applyPreviewTheme と同じテーマ計算を、
+     任意の要素・デザイン・色に対して行う版 */
+  function applySearchPvTheme(el, design, designColor){
+    if(!el) return;
+    var d = (design === "check" || design === "site") ? design : "simple";
+    var acc = designColor || "#ef6aa5";
+    var c = hexRgb(acc);
+    var lum = (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) / 255;
+    var isBlack = lum < 0.12;
+    var light = lightenHex(acc, 0.35);
+    el.classList.toggle("pv-check", d === "check");
+    el.classList.toggle("pv-simple", d === "simple");
+    el.classList.toggle("pv-dark", d === "site");
+    if(d === "check" || d === "simple"){
+      var isLight = lum > 0.82;
+      var edge = isLight ? darkerHex(acc, 0.5) : acc;
+      var pc = isLight ? hexRgb(edge) : c;
+      var darkText = isLight ? darkerHex(acc, 0.42) : darkerHex(acc, 0.66);
+      if(d === "check"){
+        var w = el.clientWidth || 400;
+        var tile = Math.max(6, w / 38);
+        el.style.background = "";
+        el.style.backgroundColor = "#ffffff";
+        el.style.backgroundImage = "linear-gradient(90deg, rgba(" + pc.r + "," + pc.g + "," + pc.b + ",.30) 50%, transparent 50%),linear-gradient(rgba(" + pc.r + "," + pc.g + "," + pc.b + ",.30) 50%, transparent 50%)";
+        el.style.backgroundSize = tile + "px " + tile + "px";
+      } else {
+        el.style.backgroundImage = "";
+        el.style.backgroundSize = "";
+        el.style.backgroundColor = "";
+        el.style.background = lightenHex(edge, 0.93);
       }
+      el.style.setProperty("--pv-accent", acc);
+      el.style.setProperty("--pv-edge", edge);
+      el.style.setProperty("--pv-darktext", darkText);
+      el.style.setProperty("--pv-band-text", isLight ? "#3a1026" : "#ffffff");
+      el.style.setProperty("--text", "#3a1026");
+      el.style.setProperty("--dim", "#6b4356");
+      el.style.setProperty("--faint", darkText);
+      el.style.setProperty("--surface-2", lightenHex(edge, 0.90));
+      el.style.setProperty("--surface-3", lightenHex(edge, 0.93));
+      el.style.setProperty("--border", edge);
+      el.style.setProperty("--border-soft", "rgba(" + pc.r + "," + pc.g + "," + pc.b + ",.35)");
+      el.style.setProperty("--pink", darkText);
+      el.style.setProperty("--pink-soft", "rgba(" + pc.r + "," + pc.g + "," + pc.b + ",.14)");
+      el.style.setProperty("--purple", edge);
+      return;
     }
+    el.style.backgroundImage = "";
+    el.style.backgroundSize = "";
+    el.style.backgroundColor = "";
+    var label = isBlack ? "#ffffff" : light;
+    el.style.background = "linear-gradient(165deg," + deepToneHex(acc, 0.20) + " 0%," + deepToneHex(acc, 0.145) + " 55%," + deepToneHex(acc, 0.10) + " 100%)";
+    el.style.setProperty("--text", "#fff5f9");
+    el.style.setProperty("--dim", "#ecc9db");
+    el.style.setProperty("--surface-2", deepToneHex(acc, 0.23));
+    el.style.setProperty("--surface-3", deepToneHex(acc, 0.19));
+    el.style.setProperty("--border", acc);
+    el.style.setProperty("--border-soft", isBlack ? "rgba(255,255,255,.20)" : "rgba(" + c.r + "," + c.g + "," + c.b + ",.45)");
+    el.style.setProperty("--pink", label);
+    el.style.setProperty("--pink-soft", "rgba(" + c.r + "," + c.g + "," + c.b + ",.28)");
+    el.style.setProperty("--purple", light);
+    el.style.setProperty("--faint", isBlack ? "#ffffff" : lightenHex(acc, 0.5));
+  }
+  /* 完成プレビュー末尾と同じシェアボックス（このページ用） */
+  function searchProfileShareBoxHtml(name){
+    var sUrl = getShareUrl(name);
+    return '<div class="share-box"><h3>このページをシェア</h3>'
+      + (sUrl ? '<p class="share-url"><b>推しプロフィールのURL</b>' + esc(sUrl) + '</p>' : '')
+      + '<div class="share-row">'
+      + (sUrl ? '<button type="button" class="share-btn" data-share="copy">' + IC.copy + 'URLをコピー</button>' : '')
+      + (sUrl ? '<button type="button" class="share-btn" data-share="qr">' + IC.qr + 'QRコード</button>' : '')
+      + '<button type="button" class="share-btn" data-share="x">' + IC.x + 'Xでポスト</button>'
+      + '<button type="button" class="share-btn" data-share="line">' + IC.line + 'LINEで送る</button>'
+      + '<button type="button" class="share-btn wide" data-share="other">' + IC.share + 'その他のアプリで共有</button>'
+      + '</div>'
+      + '<p class="share-tagline">' + SITE_HASHTAG + '</p>'
+      + '<p class="share-note">共有先のSNSやアプリの仕様により、プレビューの表示内容が異なる場合があります。</p>'
+      + '</div>';
+  }
+  var SEARCH_PV_PHOTO_PH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 19 5.5-5.5 3 3L17 13l2 2.5"/></svg>プロフィール画像';
+  /* 保存済みプロフィール（collectProfileData の形）から、
+     完成プレビュー（renderPreview）と同構成のHTMLを組み立てる */
+  function buildSearchProfileHtmlFromData(data){
+    var f = data.fields || {};
+    var ck = data.checks || {};
+    var snsData = data.sns || {};
+    var optsData = data.opts || {};
+    var name = String(f["f-name"] || "").trim();
+    var furi = String(f["f-furigana"] || "").trim();
+    var genre = String(f["f-genre"] || "").trim();
+    var b = null;
+    if(ck["f-birthPrivate"]) b = { priv:true };
+    else {
+      var bp = String(f["f-birth"] || "").split("-");
+      if(bp.length === 3 && +bp[1] && +bp[2]) b = { y:+bp[0], m:+bp[1], d:+bp[2], zodiac: zodiacOf(+bp[1], +bp[2]), yearPriv: !!ck["f-yearPrivate"] };
+    }
+    var height = String(f["f-height"] || "").trim();
+    var blood = String(f["f-blood"] || "").trim();
+    var originPriv = !!ck["f-originPrivate"];
+    var origin = String(f["f-origin"] || "").trim();
+    if(origin === "海外"){
+      var ctry = String(f["f-originCountry"] || "").trim();
+      origin = ctry ? "海外（" + ctry + "）" : "海外";
+    }
+    var html = '<div class="pv-hero">';
+    if(data.profileImg){
+      html += '<img class="pv-img" src="' + data.profileImg + '" alt="プロフィール画像" />';
+    } else {
+      html += '<div class="pv-img-ph">' + SEARCH_PV_PHOTO_PH + '</div>';
+    }
+    if(genre) html += '<span class="pv-genre">' + esc(genre) + '</span>';
+    html += '<p class="pv-furi">' + esc(furi) + '</p>';
+    html += '<h2 class="pv-name">' + (name ? esc(name) : '<span class="ph">名前を入力してください</span>') + '</h2>';
+    var snsHtml = "";
+    var snsItems = "";
+    SNS.forEach(function(s){
+      var u = snsUrl(s.key, snsData[s.key]);
+      if(!u) return;
+      snsHtml += '<a href="' + esc(u) + '" target="_blank" rel="noopener noreferrer" aria-label="' + s.name + '">' + IC[s.key] + '</a>';
+      snsItems += '<a class="pv-snsitem" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"><span class="ic">' + IC[s.key] + '</span><span class="nm">' + s.name + '</span><span class="url">' + esc(u.replace(/^https?:\/\//, "")) + '</span></a>';
+    });
+    if(snsHtml) html += '<div class="pv-sns">' + snsHtml + '</div>';
+    html += '</div>';
+    /* profile table */
+    var rows = "";
+    if(b) rows += '<tr><th>生年月日</th><td>' + esc(birthText(b)) + '</td></tr>';
+    if(b && !b.priv && b.zodiac) rows += '<tr><th>星座</th><td>' + esc(b.zodiac) + '</td></tr>';
+    if(height) rows += '<tr><th>身長</th><td>' + esc(height) + 'cm</td></tr>';
+    if(blood) rows += '<tr><th>血液型</th><td>' + esc(blood) + '</td></tr>';
+    if(originPriv) rows += '<tr><th>出身地</th><td>非公表</td></tr>';
+    else if(origin) rows += '<tr><th>出身地</th><td>' + esc(origin) + '</td></tr>';
+    OPTS.forEach(function(o){
+      var saved = optsData[o.key];
+      if(!saved || !saved.on) return;
+      var v = String(saved.val || "").trim();
+      if(o.color){
+        var cat = inferMemberColorCategory(saved);
+        var disp = v || cat;
+        if(!disp) return;
+        var hex = memberColorHex(cat) || String(saved.color || "") || "#ff7ac0";
+        rows += '<tr><th>' + esc(o.label) + '</th><td><span class="color-dot" style="background:' + esc(hex) + '"></span>' + esc(disp) + '</td></tr>';
+        return;
+      }
+      if(!v) return;
+      if(o.date) v = jpDateText(v);
+      rows += '<tr><th>' + esc(o.label) + '</th><td>' + esc(v) + '</td></tr>';
+    });
+    if(rows) html += secHead(IC.user, "プロフィール") + '<table class="info-table">' + rows + '</table></div>';
+    /* points */
+    var points = (data.points && typeof data.points === "object") ? data.points : {};
+    var pointOrder = Array.isArray(data.pointOrder) ? data.pointOrder : [];
+    var ptHtml = "";
+    pointOrder.forEach(function(t){
+      var txt = String(points[t] || "").trim();
+      ptHtml += '<div class="pt-card"><span class="tag">' + esc(t) + '</span>' + (txt ? esc(txt) : '<span style="color:var(--faint)">（推しポイント未入力）</span>') + '</div>';
+    });
+    var free = String(f["f-free"] || "").trim();
+    if(free) ptHtml += '<p class="pv-free">' + esc(free) + '</p>';
+    if(ptHtml) html += secHead(IC.heart, "推しポイント") + ptHtml + '</div>';
+    /* songs */
+    var affSettings = readAffiliateSettings();
+    var songs = Array.isArray(data.songs) ? data.songs : [];
+    var songHtml = "";
+    var songHasAffiliate = false;
+    songs.forEach(function(s){
+      if(!s || !String(s.title || "").trim()) return;
+      var affHtml = songAffiliateHtml(s, affSettings);
+      if(affHtml) songHasAffiliate = true;
+      songHtml += '<div class="pv-song">' + songTileHtml(s) + '<div>'
+        + '<div class="st">' + esc(s.title) + '</div><div class="sa">' + esc(s.artist) + '</div>'
+        + (s.reason && String(s.reason).trim() ? '<div class="sr2">' + esc(s.reason) + '</div>' : '')
+        + (s.link ? '<a class="pv-listen" href="' + esc(s.link) + '" target="_blank" rel="noopener noreferrer">Apple Musicで聴く</a>' : '')
+        + affHtml
+        + '</div></div>';
+    });
+    if(songHtml) html += secHead(IC.music, "好きな曲") + songHtml
+      + (songHasAffiliate ? '<p class="pv-song-aff">※「Amazonで探す」「楽天で探す」はアフィリエイト広告（PR）です。リンク経由で購入されると運営に紹介料が入る場合があります。</p>' : '')
+      + '</div>';
+    /* videos */
+    var videos = Array.isArray(data.videos) ? data.videos : [];
+    var vidHtml = "";
+    videos.forEach(function(v){
+      if(!v) return;
+      var u = normUrl(v.url);
+      if(!u) return;
+      var id = ytId(v.url);
+      var title = String(v.title || "").trim() || "おすすめ動画";
+      vidHtml += '<a class="pv-video" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer"><span class="thumb">'
+        + (id ? '<img src="https://i.ytimg.com/vi/' + id + '/hqdefault.jpg" alt="" loading="lazy" onerror="this.remove()" />' : '')
+        + '<span class="play">' + IC.play + '</span></span>'
+        + '<span class="v-body"><span class="v-t">' + esc(title) + '</span>'
+        + (String(v.comment || "").trim() ? '<span class="v-c" style="display:block">' + esc(v.comment) + '</span>' : '')
+        + '</span></a>';
+    });
+    if(vidHtml) html += secHead(IC.play, "おすすめMV･動画") + vidHtml + '</div>';
+    /* records */
+    var records = Array.isArray(data.records) ? data.records : [];
+    var rHtml = "";
+    records.forEach(function(r){
+      if(!r || r.vis === "private") return;
+      if(!String(r.title || "").trim() && !String(r.comment || "").trim() && !r.img && !normUrl(r.sns)) return;
+      rHtml += '<div class="pv-rec">'
+        + (r.img ? '<img src="' + r.img + '" alt="" />' : '')
+        + (String(r.title || "").trim() ? '<div class="r-t">' + esc(r.title) + '</div>' : '')
+        + (r.date ? '<div class="r-d">' + esc(String(r.date).replace(/-/g, "/")) + '</div>' : '')
+        + (String(r.comment || "").trim() ? '<div class="r-c">' + esc(r.comment) + '</div>' : '')
+        + recordSnsHtml(r.sns)
+        + '</div>';
+    });
+    if(rHtml) html += secHead(IC.camera, "推し活記録") + rHtml + '</div>';
+    /* goods */
+    var goods = Array.isArray(data.goods) ? data.goods : [];
+    var gHtml = "";
+    goods.forEach(function(g){
+      if(!g || !String(g.name || "").trim()) return;
+      var u = normUrl(g.url);
+      gHtml += '<div class="pv-goods"><div class="g-img">' + (g.img ? '<img src="' + g.img + '" alt="" />' : esc(g.cat)) + '</div><div>'
+        + '<div class="g-t">' + esc(g.name) + '<span class="g-cat">' + esc(g.cat) + '</span>' + (g.ad && u ? '<span class="g-ad">広告</span>' : '') + '</div>'
+        + (String(g.desc || "").trim() ? '<div class="g-d">' + esc(g.desc) + '</div>' : '')
+        + (u ? '<a class="g-buy" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer sponsored">購入ページへ</a>' : '')
+        + '</div></div>';
+    });
+    if(gHtml) html += secHead(IC.bag, "グッズ・購入リンク") + '<p class="pv-goods-lead">気になるものがあったら、少しずつ集めてみよう。</p>' + gHtml + '<p class="pv-goods-aff">※このセクションのリンクはアフィリエイト広告（PR）です。リンク経由で購入されると運営に紹介料が入る場合があります。</p>' + '</div>';
+    /* official SNS / external links */
+    if(snsItems) html += secHead(IC.other, "推しの公式SNS・外部リンク") + '<div class="pv-snslist">' + snsItems + '</div></div>';
+    /* share */
+    html += searchProfileShareBoxHtml(name);
+    /* この推しのアルバム（完成プレビューと同じ棚） */
+    var shelfSongs = songs.filter(function(s){ return s && String(s.title || "").trim(); });
+    if(shelfSongs.length){
+      var shelfCards = "";
+      shelfSongs.slice(0, 12).forEach(function(s){
+        shelfCards += albumCardHtml({ song:s, oshi:"" }, affSettings);
+      });
+      html += '<section class="pv-album" aria-label="この推しのアルバム">'
+        + '<div class="pv-album-head"><span class="pr-badge">PR</span><h3>この推しのアルバム</h3></div>'
+        + '<div class="album-track">' + shelfCards + '</div>'
+        + '<p class="pv-album-note">' + esc(albumNoteText(affSettings)) + '</p>'
+        + '</section>';
+    }
+    return html;
+  }
+  /* 汎用JSON形式（将来の公開プロフィール）の項目から組み立てる版:
+     normalizeSearchItem の形しかない項目はこちらで表示する */
+  function buildSearchProfileHtmlFromItem(p){
+    var html = '<div class="pv-hero">';
+    if(p.img){
+      html += '<img class="pv-img" src="' + p.img + '" alt="プロフィール画像" />';
+    } else {
+      html += '<div class="pv-img-ph">' + SEARCH_PV_PHOTO_PH + '</div>';
+    }
+    if(p.genre) html += '<span class="pv-genre">' + esc(p.genre) + '</span>';
+    html += '<p class="pv-furi">' + esc(p.furigana) + '</p>';
+    html += '<h2 class="pv-name">' + (p.name ? esc(p.name) : '<span class="ph">名前未入力</span>') + '</h2>';
+    html += '</div>';
+    var rows = "";
+    if(p.group) rows += '<tr><th>所属グループ</th><td>' + esc(p.group) + '</td></tr>';
+    if(p.birthText) rows += '<tr><th>生年月日</th><td>' + esc(p.birthText) + '</td></tr>';
+    if(p.zodiac) rows += '<tr><th>星座</th><td>' + esc(p.zodiac) + '</td></tr>';
+    if(p.originDisplay) rows += '<tr><th>出身地</th><td>' + esc(p.originDisplay) + '</td></tr>';
+    if(p.colorName) rows += '<tr><th>メンバーカラー</th><td>' + (p.colorHex ? '<span class="color-dot" style="background:' + esc(p.colorHex) + '"></span>' : '') + esc(p.colorName) + '</td></tr>';
+    if(rows) html += secHead(IC.user, "プロフィール") + '<table class="info-table">' + rows + '</table></div>';
+    var ptHtml = "";
+    var seenTags = {};
+    if(p.pointsText){
+      String(p.pointsText).split("\n").forEach(function(line){
+        var tx = line.trim();
+        if(!tx) return;
+        var mi = tx.indexOf("：");
+        var tag = mi > 0 ? tx.slice(0, mi) : "";
+        if(tag && TAGS.indexOf(tag) >= 0){
+          seenTags[tag] = true;
+          ptHtml += '<div class="pt-card"><span class="tag">' + esc(tag) + '</span>' + esc(tx.slice(mi + 1)) + '</div>';
+        } else {
+          ptHtml += '<p class="pv-free">' + esc(tx) + '</p>';
+        }
+      });
+    }
+    (p.tags || []).forEach(function(t){ if(!seenTags[t]) ptHtml += '<div class="pt-card"><span class="tag">' + esc(t) + '</span></div>'; });
+    if(ptHtml) html += secHead(IC.heart, "推しポイント") + ptHtml + '</div>';
+    html += searchProfileShareBoxHtml(p.name || "");
+    return html;
+  }
+  /* 検索結果のカードから、その推しのプロフィールページを開く */
+  function showSearchProfilePage(id){
+    var all = loadSearchData();
+    var p = null;
+    all.forEach(function(it){ if(String(it.id) === String(id)) p = it; });
+    if(!p) return;
+    var root = $("searchPvRoot");
+    if(!root) return;
+    var entry = p.isLocal ? getProfileEntry(p.id) : null;
+    var data = entry && entry.data ? entry.data : null;
+    searchProfileName = p.name || (data && data.fields ? String(data.fields["f-name"] || "").trim() : "");
+    var design = "simple", designColor = "#ef6aa5";
+    if(data){
+      root.innerHTML = buildSearchProfileHtmlFromData(data);
+      if(data.design === "simple" || data.design === "check" || data.design === "site") design = data.design;
+      if(typeof data.designColor === "string" && /^#[0-9a-f]{6}$/i.test(data.designColor)) designColor = data.designColor;
+    } else {
+      root.innerHTML = buildSearchProfileHtmlFromItem(p);
+    }
+    var titleEl = $("searchProfileTitle");
+    if(titleEl) titleEl.textContent = searchProfileName ? searchProfileName + "のプロフィール" : "推しプロフィール";
+    var actions = $("searchProfileActions");
+    if(actions) actions.innerHTML = p.isLocal ? '<div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-primary" data-search-edit="' + esc(p.id) + '">編集する</button></div>' : "";
+    closeMenuPanel();
+    hideSubViews();
+    $("homeView").hidden = true;
+    $("editorView").hidden = true;
+    if($("sharePageView")) $("sharePageView").hidden = true;
+    $("searchProfileView").hidden = false;
+    applySearchPvTheme(root, design, designColor);
+    window.scrollTo(0, 0);
+    scheduleSnsEmbeds();
   }
   function clearSearch(){
     searchSelectedTags = [];
@@ -5907,16 +6281,46 @@
       $("searchView").hidden = false;
       window.scrollTo(0, 0);
     });
+    /* 結果カードをタップしたら、その場に詳細を出すのではなく
+       その推しのプロフィールページへ遷移する */
     $("searchResultsView").addEventListener("click", function(e){
       var card = e.target.closest("[data-search-card]");
-      if(card){
-        var cid = card.getAttribute("data-search-id");
-        searchSelectedId = (searchSelectedId === cid) ? null : cid;
-        renderSearchResults();
-        return;
-      }
+      if(card){ showSearchProfilePage(card.getAttribute("data-search-id")); return; }
+    });
+    /* プロフィールページの「もどる」: 検索結果ページに戻る
+       （結果一覧と絞り込み条件はそのまま残っている） */
+    $("btnBackToResults").addEventListener("click", function(){
+      $("searchProfileView").hidden = true;
+      $("searchResultsView").hidden = false;
+      window.scrollTo(0, 0);
+    });
+    /* プロフィールページ内: 編集ボタンとシェアボタン
+       （シェアは表示中の推しの名前で組み立てる） */
+    $("searchProfileView").addEventListener("click", function(e){
       var editBtn = e.target.closest("[data-search-edit]");
       if(editBtn){ openEditor("edit", editBtn.getAttribute("data-search-edit")); return; }
+      var b = e.target.closest("[data-share]");
+      if(!b) return;
+      var kind = b.getAttribute("data-share");
+      var name = searchProfileName;
+      var text = shareText(name);
+      var url = getShareUrl(name);
+      var title = shareTitle(name);
+      if(kind === "x"){
+        window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) + (url ? "&url=" + encodeURIComponent(url) : ""), "_blank", "noopener");
+      } else if(kind === "line"){
+        window.open("https://line.me/R/msg/text/?" + encodeURIComponent(url ? text + "\n" + url : text), "_blank", "noopener");
+      } else if(kind === "copy"){
+        if(url) copyTextToClipboard(url, "URLをコピーしました");
+      } else if(kind === "other"){
+        var payload = url ? { title:title, text:text, url:url } : { title:title, text:text };
+        var fb = url || text;
+        if(!shareViaWebApi(payload, fb, url ? "URLをコピーしました" : "共有文をコピーしました")){
+          copyTextToClipboard(fb, url ? "この端末では直接共有できないため、URLをコピーしました" : "共有文をコピーしました");
+        }
+      } else if(kind === "qr"){
+        if(url) openQrModal(url, url);
+      }
     });
   }
   function openSubView(id){
@@ -6049,6 +6453,32 @@
       else clearSavedProfileData();
       renderMyPage();
       toast("プロフィールを削除しました");
+      return;
+    }
+    var delSheetBtn = e.target.closest("[data-mp-delete-sheet]");
+    if(delSheetBtn){
+      /* Each sheet panel carries its own confirmation box, like
+         the profile panels: open the one inside the panel whose
+         削除する was tapped, and close every other delete
+         confirmation (profile and sheet alike). */
+      document.querySelectorAll("[data-mp-delete-confirm-box], [data-mp-delete-sheet-confirm-box]").forEach(function(b){ b.hidden = true; });
+      var spanel = delSheetBtn.closest(".oshi-detail");
+      var sbox = spanel ? spanel.querySelector("[data-mp-delete-sheet-confirm-box]") : null;
+      if(sbox) sbox.hidden = false;
+      return;
+    }
+    var cancelSheetBtn = e.target.closest("[data-mp-delete-sheet-cancel]");
+    if(cancelSheetBtn){
+      var sbox2 = cancelSheetBtn.closest("[data-mp-delete-sheet-confirm-box]");
+      if(sbox2) sbox2.hidden = true;
+      return;
+    }
+    var confirmSheetBtn = e.target.closest("[data-mp-delete-sheet-confirm]");
+    if(confirmSheetBtn){
+      var delSheetId = confirmSheetBtn.getAttribute("data-mp-delete-sheet-confirm");
+      if(delSheetId) deleteSheetById(delSheetId);
+      renderMyPage();
+      toast("布教シートを削除しました");
       return;
     }
   });
