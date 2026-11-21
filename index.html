@@ -414,11 +414,17 @@
   .pv-album .album-card-oshi{color:#d93d92}
   .pv-album .album-buy a{color:#d93d92; border-color:#d93d92}
   .pv-album-note{margin:4px 0 2px; font-size:11px; color:#8a6478; line-height:1.7}
-  /* mypage favorites, empty state: the affiliate area under the
-     empty message — the album shelf when saved profiles have
-     songs, otherwise an in-page ad slot for an affiliate banner */
+  /* mypage favorites: the affiliate area — under the empty
+     message when there are no favorites (one placement), or
+     above and below the card grid when there are favorites.
+     The album shelf when saved profiles have songs, otherwise
+     an in-page ad slot for an affiliate banner */
   .fav-aff{margin-top:16px; text-align:left}
   .fav-aff .album-shelf{margin-top:0}
+  /* favorites with items: the same affiliate area also sits
+     above the card grid (top) and below it (bottom) */
+  .fav-aff--top{margin-top:0; margin-bottom:16px}
+  .fav-aff--bottom{margin-top:16px}
   /* ad slots on sub pages (検索結果 / お知らせ): same slot design as
      the top page, tighter spacing so they sit at the very top and
      bottom of the page content without pushing it around */
@@ -5895,7 +5901,9 @@
           var fid = en.id ? String(en.id) : ("fav" + i);
           fgrid += favCardHtml(fid, favName(en), favImg(en), fid === selectedFavId);
         });
-        favList.innerHTML = '<div class="fav-grid">' + fgrid + '</div>';
+        favList.innerHTML = favAffiliateHtml("top", "fav-aff--top")
+          + '<div class="fav-grid">' + fgrid + '</div>'
+          + favAffiliateHtml("bottom", "fav-aff--bottom");
         if(favDetail){
           var fsel = null;
           favorites.forEach(function(en, i){ if((en.id ? String(en.id) : ("fav" + i)) === selectedFavId) fsel = en; });
@@ -5911,6 +5919,9 @@
       }
     }
     if(window.requestAnimationFrame) requestAnimationFrame(fitMpSheetThumbs);
+    /* Fill any affiliate ad slots just rendered above (the
+       favorites top / bottom / empty slots) with banners. */
+    if(typeof renderAdSlots === "function") renderAdSlots();
   }
   /* ============================================================
      推し検索 — 新しい推しを探すための検索
@@ -7011,26 +7022,33 @@
     });
   }
 
-  /* ---------- mypage favorites (empty): affiliate area ----------
-     お気に入りが空のときの表示にもアフィリエイトを入れる。
+  /* ---------- mypage favorites: affiliate area ----------
+     お気に入り画面のアフィリエイト表示。空のときは空メッセージの
+     下に1か所だけ、お気に入りが1件以上あるときはカード一覧の
+     上と下に1か所ずつ出す（空のときと重複させない）。
      保存済みプロフィールの「好きな曲」があればアルバム棚を、
      曲データが無い場合はアフィリエイトバナー用の広告枠を出す
-     （曲が登録されれば renderAdSlots がバナーを差し込む）。 */
-  function favEmptyAffiliateHtml(){
+     （曲が登録されれば renderAdSlots がバナーを差し込む）。
+     slotKey は広告枠ごとに変え、枠ごとに違う曲が出るようにする。 */
+  function favAffiliateHtml(slotKey, extraClass){
+    var cls = "fav-aff" + (extraClass ? " " + extraClass : "");
     var items = collectShelfItems();
     if(items.length){
       var aff = readAffiliateSettings();
       var cards = "";
       items.slice(0, 12).forEach(function(it){ cards += albumCardHtml(it, aff); });
-      return '<div class="fav-aff"><section class="album-shelf" aria-label="好きな曲のアルバム">'
+      return '<div class="' + cls + '"><section class="album-shelf" aria-label="好きな曲のアルバム">'
         + '<div class="album-shelf-head"><span class="pr-badge">PR</span><h2>好きな曲のアルバム</h2></div>'
         + '<p class="album-shelf-lead">保存した推しプロフィールの「好きな曲」からピックアップ。気になる曲はそのままストアでチェックできます。</p>'
         + '<div class="album-track">' + cards + '</div>'
         + '<p class="album-shelf-note">' + esc(albumNoteText(aff)) + '</p>'
         + '</section></div>';
     }
-    return '<div class="fav-aff"><div class="top-ad-head"><span class="pr-badge">PR</span><span class="top-ad-label">広告</span></div>'
-      + '<div class="ad-slot" data-ad-slot="mypage-favs-empty"><p class="ad-slot-ph">広告</p></div></div>';
+    return '<div class="' + cls + '"><div class="top-ad-head"><span class="pr-badge">PR</span><span class="top-ad-label">広告</span></div>'
+      + '<div class="ad-slot" data-ad-slot="mypage-favs-' + esc(slotKey) + '"><p class="ad-slot-ph">広告</p></div></div>';
+  }
+  function favEmptyAffiliateHtml(){
+    return favAffiliateHtml("empty", "");
   }
 
   /* ---------- about section (top page) ---------- */
