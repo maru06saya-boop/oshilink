@@ -22,6 +22,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-DCDL4QLNWW"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-DCDL4QLNWW');
+</script>
 <style>
   :root{
     --bg:#fbf9fa;
@@ -2241,7 +2249,7 @@
     <div class="legal-sec">
       <h3><span class="legal-no">3.</span>Cookieなどについて</h3>
       <p>本サービス自体は、データの保存にブラウザのlocalStorageを使用しています。一方、アフィリエイトリンク先のAmazonや楽天などでは、購入の成果を計測するために、各事業者がCookieなどを使用する場合があります。詳しくは各事業者のポリシーを確認してください。</p>
-      <p>アクセス解析ツールは導入していません。</p>
+      <p>また、本サービスではアクセス解析のためにGoogleアナリティクス（Google LLCが提供するアクセス解析ツール）を使用しています。GoogleアナリティクスはCookieを使用して、本サービスの利用状況（アクセス数、利用された機能、流入元など）を計測します。収集される情報は、個人を特定しない形でGoogleへ送信され、アクセス解析の目的でのみ使用されます。氏名・メールアドレスなど、個人を特定できる情報がGoogleへ送信されることはありません。Googleアナリティクスでデータが収集・処理される仕組みについては、Googleのポリシーを確認してください。Cookieはブラウザの設定で無効化できます。無効化した場合も、本サービスの機能はそのまま利用できます。</p>
     </div>
     <div class="legal-sec">
       <h3><span class="legal-no">4.</span>第三者への提供</h3>
@@ -2426,6 +2434,39 @@
   }
   var toastTimer = null;
   function toast(msg, holdMs){ var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove("show"); }, holdMs || 2400); }
+
+  /* ---------- Google アナリティクス（gtag.js） ----------
+     head 内の gtag.js が読み込めない環境（プレビュー等）でも
+     サイトの動作に影響しないよう、すべての送信を typeof
+     チェックと try/catch でガードする。イベントには個人情報
+     （名前・メールアドレス・検索した文字列そのもの）を一切
+     含めない。 */
+  function gaEvent(name, params){
+    try {
+      if(typeof window.gtag === "function") window.gtag("event", name, params || {});
+    } catch(e){}
+  }
+  function gaView(view){ gaEvent("view_open", { view: view }); }
+  /* サブビュー（openSubView で開く画面）の id → ビュー識別名 */
+  var GA_VIEW_NAMES = {
+    mypageView: "mypage",
+    mypageProfilesView: "mypage_profiles",
+    mypageSheetsView: "mypage_sheets",
+    mypageFavsView: "favorites",
+    searchView: "search",
+    searchResultsView: "search_results",
+    searchProfileView: "search_profile",
+    publicProfileView: "public_profile",
+    authView: "auth",
+    termsView: "terms",
+    newsView: "news",
+    faqView: "faq",
+    premiumView: "premium",
+    adsView: "ads",
+    privacyView: "privacy",
+    contactView: "contact",
+    tokushoView: "tokusho"
+  };
 
   /* ---------- zodiac ---------- */
   function zodiacOf(m, d){
@@ -3839,12 +3880,14 @@
     $("editorView").hidden = false;
     window.scrollTo(0, 0);
     if(window.requestAnimationFrame) requestAnimationFrame(applyPreviewTheme);
+    gaView("profile_create");
   }
   function closeEditor(){
     $("editorView").hidden = true;
     $("homeView").hidden = false;
     if(typeof renderAlbumShelf === "function") renderAlbumShelf();
     window.scrollTo(0, 0);
+    gaView("top");
   }
   document.querySelectorAll("[data-open-editor]").forEach(function(b){ b.addEventListener("click", openEditor); });
   $("btnBack").addEventListener("click", closeEditor);
@@ -4870,11 +4913,13 @@
     }
     renderSharePage();
     window.scrollTo(0, 0);
+    gaView("share");
   }
   function closeSharePage(){
     $("sharePageView").hidden = true;
     $("homeView").hidden = false;
     window.scrollTo(0, 0);
+    gaView("top");
   }
   document.querySelectorAll("[data-open-sharepage]").forEach(function(b){ b.addEventListener("click", openSharePage); });
   $("btnBackSharePage").addEventListener("click", closeSharePage);
@@ -5612,6 +5657,14 @@
         sbSessionUser = session ? sbUserFromSupabase(session.user) : null;
         if(typeof syncAuthUI === "function") syncAuthUI();
         if(event === "SIGNED_IN" && sbSessionUser) sbFetchAndMergeProfiles();
+        /* Googleログインは OAuth リダイレクトから戻ってきたときに
+           ここで SIGNED_IN が発火する（メールログインはフォーム側で
+           login_completed を送るため、ここでは google のみ数える）。
+           method 以外の情報はイベントに含めない。 */
+        if(event === "SIGNED_IN" && session && session.user){
+          var provider = (session.user.app_metadata && session.user.app_metadata.provider) || "";
+          if(provider === "google" && typeof gaEvent === "function") gaEvent("login_completed", { method: "google" });
+        }
       });
     } catch(e){ /* セッション復元に失敗しても通常表示で続行 */ }
   })();
@@ -5705,6 +5758,7 @@
     }
     syncAuthUI();
     window.scrollTo(0, 0);
+    gaView("auth");
   }
   var pendingAuthLabel = "";
   function requireAuth(action, label){
@@ -5798,6 +5852,7 @@
       authShowError("");
       syncAuthUI();
       toast("ログインしました");
+      gaEvent("login_completed", { method: "email" });
       sbFetchAndMergeProfiles();
       runPendingAuthAction();
     }).catch(function(){ authShowError("ログインに失敗しました。時間をおいてもう一度お試しください。"); });
@@ -6031,6 +6086,7 @@
     $("homeView").hidden = false;
     if(typeof renderAlbumShelf === "function") renderAlbumShelf();
     window.scrollTo(0, 0);
+    gaView("top");
   }
   function readStoredJson(key){
     try {
@@ -6324,6 +6380,7 @@
     if(info.genre) entry.genre = String(info.genre);
     favs.push(entry);
     writeFavorites(favs);
+    gaEvent("favorite_added");
     return true;
   }
   function favToggleButtonHtml(ref){
@@ -7380,6 +7437,7 @@
     applySearchPvTheme(root, design, designColor);
     window.scrollTo(0, 0);
     scheduleSnsEmbeds();
+    gaView("search_profile");
   }
   /* ---------- 公開プロフィールページ（?u=<slug>） ----------
      URL に ?u=<slug> が付いて開かれたら、Supabase の profiles
@@ -7416,6 +7474,7 @@
     var root = $("publicPvRoot"); if(root){ root.innerHTML = ""; root.hidden = true; }
     var actions = $("publicProfileActions"); if(actions) actions.innerHTML = "";
     window.scrollTo(0, 0);
+    gaView("public_profile");
     try {
       sbFetchProfileBySlug(target).then(function(entry){
         if(!entry || !entry.data){
@@ -7519,6 +7578,10 @@
     if($("sharePageView")) $("sharePageView").hidden = true;
     $("searchResultsView").hidden = false;
     window.scrollTo(0, 0);
+    /* 検索フォームの送信からのみ呼ばれる＝推し検索の実行。
+       検索条件そのものはイベントに含めない。 */
+    gaEvent("search_executed");
+    gaView("search_results");
   }
   function initSearch(){
     if(searchInited) return;
@@ -7560,6 +7623,7 @@
       $("searchResultsView").hidden = true;
       $("searchView").hidden = false;
       window.scrollTo(0, 0);
+      gaView("search");
     });
     /* 結果カードをタップしたら、その場に詳細を出すのではなく
        その推しのプロフィールページへ遷移する */
@@ -7573,6 +7637,7 @@
       $("searchProfileView").hidden = true;
       $("searchResultsView").hidden = false;
       window.scrollTo(0, 0);
+      gaView("search_results");
     });
     /* プロフィールページ内: 編集ボタンとシェアボタン
        （シェアは表示中の推しの名前で組み立てる） */
@@ -7634,6 +7699,7 @@
     if(id === "mypageView" || id === "mypageProfilesView" || id === "mypageSheetsView" || id === "mypageFavsView") renderMyPage();
     if(id === "searchView") initSearch();
     window.scrollTo(0, 0);
+    gaView(GA_VIEW_NAMES[id] || id);
   }
   function closeMenuPanel(){
     var p = $("menuPanel");
@@ -8488,6 +8554,7 @@
     editorMode = "edit";
     $("profileSaveFeedback").hidden = false;
     toast("保存しました");
+    gaEvent("profile_saved");
   });
   $("btnSaveShare").addEventListener("click", function(){
     if(blockSaveForRights(true)) return;
@@ -8502,6 +8569,7 @@
     saveShareNow();
     $("shareSaveFeedback").hidden = false;
     toast("保存しました");
+    gaEvent("share_saved");
   });
   /* ---------- visibility (公開設定) change handlers ----------
      Profile: the pick joins the editor's normal flow — it is
