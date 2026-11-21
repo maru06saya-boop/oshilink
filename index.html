@@ -278,6 +278,16 @@
   /* search result -> profile page: actions under the full-page preview */
   .search-profile-actions{margin-top:14px}
   .search-profile-actions .mypage-item-actions{margin-top:0}
+  /* public profile page (?u=<slug>): standalone view + not-found guidance */
+  .public-actions{margin-top:14px}
+  .public-actions .mypage-item-actions{margin-top:0}
+  .public-notfound{text-align:center; padding:34px 20px 30px}
+  .public-notfound h2{margin:0; font-size:18px; font-weight:900; line-height:1.5}
+  .public-notfound p{margin:10px auto 0; max-width:360px; font-size:13.5px; color:var(--dim); line-height:1.8}
+  .public-notfound .mypage-item-actions{justify-content:center; margin-top:18px}
+  .public-loading{margin:0; padding:26px 10px; text-align:center; font-size:13.5px; color:var(--faint); line-height:1.8}
+  .fav-toggle-btn{gap:7px}
+  .fav-toggle-btn svg{width:16px; height:16px; flex:none}
   .search-freeword{background:var(--surface-2); border:1.5px solid var(--border); border-radius:14px; padding:14px}
   .search-freeword label{font-size:13.5px}
   .search-freeword input[type="text"]{background:#fff !important; font-size:16px !important}
@@ -1886,6 +1896,23 @@
   <div class="search-profile-actions" id="searchProfileActions"></div>
 </div>
 
+<div class="sub-wrap" id="publicProfileView" hidden>
+  <div class="ed-top">
+    <button type="button" class="btn-back" data-back-home>← トップへもどる</button>
+    <h1 id="publicProfileTitle">推しプロフィール</h1>
+  </div>
+  <p class="public-loading" id="publicProfileLoading">プロフィールを読み込んでいます…</p>
+  <section class="fcard public-notfound" id="publicNotFound" aria-label="プロフィールが見つかりません" hidden>
+    <h2>このプロフィールは見つからないか、非公開です</h2>
+    <p>URLが間違っているか、プロフィールが非公開に設定されているか、削除された可能性があります。公開設定が「公開」または「限定公開」のプロフィールだけが、このURLで表示されます。</p>
+    <div class="mypage-item-actions">
+      <button type="button" class="mypage-btn mypage-btn-primary" data-back-home>トップへもどる</button>
+    </div>
+  </section>
+  <div class="pv" id="publicPvRoot" hidden></div>
+  <div class="public-actions" id="publicProfileActions"></div>
+</div>
+
 <div class="sub-wrap" id="termsView" hidden>
   <div class="ed-top">
     <button type="button" class="btn-back" data-back-home>← もどる</button>
@@ -2328,6 +2355,19 @@
   "use strict";
   function $(id){ return document.getElementById(id); }
   function esc(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  /* 画像URLの安全化: 保存データ（他人の公開プロフィール含む）に
+     入った画像値を innerHTML へ埋め込む前に通す。許可するのは
+     data:image/…;base64 のデータURLと http(s) URL のみで、
+     引用符・空白・山括弧を含む値は属性から抜け出せないよう
+     空文字にする。呼び出し側でも esc() と併用する。 */
+  function safeImgSrc(v){
+    var s = String(v == null ? "" : v).trim();
+    if(!s) return "";
+    if(/["'<>\\s]/.test(s)) return "";
+    if(/^data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=]+$/i.test(s)) return s;
+    if(/^https?:\/\/[^\s"'<>]+$/i.test(s)) return s;
+    return "";
+  }
   function normUrl(u){ u = String(u||"").trim(); if(!u) return ""; if(/^https?:\/\//i.test(u)) return u; if(/^[\w-]+(\.[\w-]+)+/.test(u)) return "https://" + u; return ""; }
   /* SNS fields also accept a bare handle (with or without @):
      a handle alone is not a URL, so normUrl would drop it and the
@@ -2966,7 +3006,7 @@
         + '<button type="button" class="btn-ghost-sm" data-goods-del="' + i + '">削除</button></div>'
         + '<div class="field"><label>種類</label><select data-goods="cat" data-idx="' + i + '">' + cats + '</select></div>'
         + '<div class="field"><label>商品名</label><input type="text" data-goods="name" data-idx="' + i + '" value="' + esc(g.name) + '" placeholder="商品名" /></div>'
-        + '<div class="field"><label>商品画像</label><div class="img-pick"><div class="img-thumb" style="width:58px;height:58px;border-radius:11px">' + (g.img ? '<img src="' + g.img + '" alt="" />' : '<span style="font-size:11px">画像</span>') + '</div><label class="btn-file" for="goods-file-' + i + '">画像を選ぶ</label><input type="file" id="goods-file-' + i + '" accept="image/*" data-goods-img="' + i + '" hidden /></div><label class="rights-check' + (g.img && !g.rights ? ' is-missing' : '') + '"><input type="checkbox" data-goods-rights="' + i + '"' + (g.rights ? ' checked' : '') + ' /><span>この画像を使う権利・許可を確認しました<small>画像を選んだ場合は、チェックしないと保存できません。</small></span></label>' + (g.img && !g.rights ? '<p class="rights-error">商品 ' + (i+1) + ' の画像の権利・許可の確認にチェックを入れてください。</p>' : '') + '</div>'
+        + '<div class="field"><label>商品画像</label><div class="img-pick"><div class="img-thumb" style="width:58px;height:58px;border-radius:11px">' + (safeImgSrc(g.img) ? '<img src="' + esc(safeImgSrc(g.img)) + '" alt="" />' : '<span style="font-size:11px">画像</span>') + '</div><label class="btn-file" for="goods-file-' + i + '">画像を選ぶ</label><input type="file" id="goods-file-' + i + '" accept="image/*" data-goods-img="' + i + '" hidden /></div><label class="rights-check' + (g.img && !g.rights ? ' is-missing' : '') + '"><input type="checkbox" data-goods-rights="' + i + '"' + (g.rights ? ' checked' : '') + ' /><span>この画像を使う権利・許可を確認しました<small>画像を選んだ場合は、チェックしないと保存できません。</small></span></label>' + (g.img && !g.rights ? '<p class="rights-error">商品 ' + (i+1) + ' の画像の権利・許可の確認にチェックを入れてください。</p>' : '') + '</div>'
         + '<div class="field"><label>商品説明</label><textarea data-goods="desc" data-idx="' + i + '" rows="2" placeholder="商品の説明">' + esc(g.desc) + '</textarea></div>'
         + '<div class="field"><label>購入先URL</label><input type="url" data-goods="url" data-idx="' + i + '" value="' + esc(g.url) + '" placeholder="https://" inputmode="url" /></div>'
         + '<label class="mini-toggle"><span class="sw"><input type="checkbox" data-goods="ad" data-idx="' + i + '"' + (g.ad ? " checked" : "") + ' /><i></i></span>アフィリエイトリンク（広告として表示）</label>'
@@ -3110,7 +3150,7 @@
         + '<div class="field"><label>タイトル</label><input type="text" data-rec="title" data-idx="' + i + '" value="' + esc(r.title) + '" placeholder="例：初めてのワンマンライブ" /></div>'
         + '<div class="row2"><div class="field"><label>活動日（任意）</label><input type="date" data-rec="date" data-idx="' + i + '" value="' + esc(r.date) + '" /></div>'
         + '<div class="field"><label>公開設定</label><select data-rec="vis" data-idx="' + i + '"><option value="public"' + (r.vis === "public" ? " selected" : "") + '>公開</option><option value="private"' + (r.vis === "private" ? " selected" : "") + '>非公開</option></select></div></div>'
-        + '<div class="field"><label>写真</label><div class="img-pick"><div class="img-thumb" style="width:58px;height:58px;border-radius:11px">' + (r.img ? '<img src="' + r.img + '" alt="" />' : '<span style="font-size:11px">写真</span>') + '</div><label class="btn-file" for="rec-file-' + i + '">写真を選ぶ</label><input type="file" id="rec-file-' + i + '" accept="image/*" data-rec-img="' + i + '" hidden /></div><label class="rights-check' + (r.img && !r.rights ? ' is-missing' : '') + '"><input type="checkbox" data-rec-rights="' + i + '"' + (r.rights ? ' checked' : '') + ' /><span>この写真を使う権利・許可を確認しました<small>撮影の許可だけでなく、インターネット上への公開の許可も含みます。写真を選んだ場合は、チェックしないと保存できません。</small></span></label>' + (r.img && !r.rights ? '<p class="rights-error">記録 ' + (i+1) + ' の写真の権利・許可の確認にチェックを入れてください。</p>' : '') + '</div>'
+        + '<div class="field"><label>写真</label><div class="img-pick"><div class="img-thumb" style="width:58px;height:58px;border-radius:11px">' + (safeImgSrc(r.img) ? '<img src="' + esc(safeImgSrc(r.img)) + '" alt="" />' : '<span style="font-size:11px">写真</span>') + '</div><label class="btn-file" for="rec-file-' + i + '">写真を選ぶ</label><input type="file" id="rec-file-' + i + '" accept="image/*" data-rec-img="' + i + '" hidden /></div><label class="rights-check' + (r.img && !r.rights ? ' is-missing' : '') + '"><input type="checkbox" data-rec-rights="' + i + '"' + (r.rights ? ' checked' : '') + ' /><span>この写真を使う権利・許可を確認しました<small>撮影の許可だけでなく、インターネット上への公開の許可も含みます。写真を選んだ場合は、チェックしないと保存できません。</small></span></label>' + (r.img && !r.rights ? '<p class="rights-error">記録 ' + (i+1) + ' の写真の権利・許可の確認にチェックを入れてください。</p>' : '') + '</div>'
         + '<div class="field"><label>SNS投稿のURL</label><input type="url" data-rec="sns" data-idx="' + i + '" value="' + esc(r.sns) + '" placeholder="XやInstagramの投稿URL" inputmode="url" /><p class="hint">X・Instagramの投稿URLを入れると、下とプレビューに公式埋め込みで投稿が表示されます。表示できない環境や埋め込み不可の投稿では、リンク表示になります。</p></div>'
         + '<div class="rec-embed-preview" data-rec-embed-preview="' + i + '" data-embed-for="' + esc(r.sns || "") + '">' + snsEmbedHtml(r.sns) + '</div>'
         + '<div class="field"><label>コメント</label><textarea data-rec="comment" data-idx="' + i + '" rows="2" placeholder="思い出や感想">' + esc(r.comment) + '</textarea></div>'
@@ -3144,12 +3184,36 @@
   function hasShareUrl(){
     return /^https?:\/\//i.test(String(SHARE_URL_BASE || "").trim());
   }
-  function getShareUrl(nameOverride){
+  /* 共有用URL: そのプロフィールに slug（ユーザーID）がある場合は
+     SHARE_URL_BASE + "?u=" + slug の形にする（公開プロフィール
+     ページがその slug で開く）。slug が無い場合は SHARE_URL_BASE
+     のみを返す。第2引数 slugOverride を渡したときはその slug
+     だけを使う（他人の公開プロフィールを表示中など）。省略した
+     ときは、自分のプロフィール向けにログイン中のユーザーIDと
+     編集中エントリの slug（"sb-<slug>" 形式のID）から自動で
+     補う。すべての共有経路（コピー・X・LINE・QR）はこの関数を
+     通るので、URLの形はここで一元管理する。 */
+  function getShareUrl(nameOverride, slugOverride){
     if(!hasShareUrl()) return "";
     var base = String(SHARE_URL_BASE).trim();
-    var name = (nameOverride != null ? String(nameOverride).trim() : profileNameForShare());
-    var sep = base.indexOf("?") >= 0 ? "&" : "?";
-    return base + sep + "oshi=" + encodeURIComponent(name || "profile");
+    var slug = "";
+    if(typeof slugOverride !== "undefined"){
+      slug = String(slugOverride || "").trim();
+    } else {
+      try {
+        var u = (typeof Auth !== "undefined" && Auth && typeof Auth.currentUser === "function") ? Auth.currentUser() : null;
+        if(u && u.userId) slug = String(u.userId).trim();
+      } catch(e){}
+      if(!slug && typeof currentEditingId === "string" && currentEditingId.indexOf("sb-") === 0){
+        slug = currentEditingId.slice(3);
+      }
+    }
+    slug = slug.replace(/^@+/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    if(slug){
+      var sep = base.indexOf("?") >= 0 ? "&" : "?";
+      return base + sep + "u=" + encodeURIComponent(slug);
+    }
+    return base;
   }
   function shareTitle(nameOverride){
     var name = (nameOverride != null ? String(nameOverride).trim() : profileNameForShare());
@@ -3295,7 +3359,7 @@
 
     var html = '<div class="pv-hero">';
     if(state.profileImg){
-      html += '<img class="pv-img" src="' + state.profileImg + '" alt="プロフィール画像" />';
+      html += '<img class="pv-img" src="' + esc(safeImgSrc(state.profileImg)) + '" alt="プロフィール画像" />';
     } else {
       html += '<div class="pv-img-ph"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 19 5.5-5.5 3 3L17 13l2 2.5"/></svg>プロフィール画像</div>';
     }
@@ -3378,7 +3442,7 @@
       if(r.vis === "private") return;
       if(!r.title.trim() && !r.comment.trim() && !r.img && !normUrl(r.sns)) return;
       rHtml += '<div class="pv-rec">'
-        + (r.img ? '<img src="' + r.img + '" alt="" />' : '')
+        + (safeImgSrc(r.img) ? '<img src="' + esc(safeImgSrc(r.img)) + '" alt="" />' : '')
         + (r.title.trim() ? '<div class="r-t">' + esc(r.title) + '</div>' : '')
         + (r.date ? '<div class="r-d">' + esc(r.date.replace(/-/g, "/")) + '</div>' : '')
         + (r.comment.trim() ? '<div class="r-c">' + esc(r.comment) + '</div>' : '')
@@ -3392,7 +3456,7 @@
     state.goods.forEach(function(g){
       if(!g.name.trim()) return;
       var u = normUrl(g.url);
-      gHtml += '<div class="pv-goods"><div class="g-img">' + (g.img ? '<img src="' + g.img + '" alt="" />' : esc(g.cat)) + '</div><div>'
+      gHtml += '<div class="pv-goods"><div class="g-img">' + (safeImgSrc(g.img) ? '<img src="' + esc(safeImgSrc(g.img)) + '" alt="" />' : esc(g.cat)) + '</div><div>'
         + '<div class="g-t">' + esc(g.name) + '<span class="g-cat">' + esc(g.cat) + '</span>' + (g.ad && u ? '<span class="g-ad">広告</span>' : '') + '</div>'
         + (g.desc.trim() ? '<div class="g-d">' + esc(g.desc) + '</div>' : '')
         + (u ? '<a class="g-buy" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer sponsored">購入ページへ</a>' : '')
@@ -3808,7 +3872,7 @@
       state.profileImg = url;
       state.profileRights = false;
       syncProfileRightsUI();
-      $("imgThumb").innerHTML = '<img src="' + url + '" alt="選択したプロフィール画像" />';
+      $("imgThumb").innerHTML = '<img src="' + esc(safeImgSrc(url)) + '" alt="選択したプロフィール画像" />';
       $("btnPhotoClear").hidden = false;
       renderAll();
     });
@@ -4154,7 +4218,7 @@
   }
   function updateSpImgThumb(){
     if(spState.imgSet && spState.img){
-      $("spImgThumb").innerHTML = '<img src="' + spState.img + '" alt="選択したプロフィール写真" />';
+      $("spImgThumb").innerHTML = '<img src="' + esc(safeImgSrc(spState.img)) + '" alt="選択したプロフィール写真" />';
       $("btnSpPhotoClear").hidden = false;
     } else {
       $("spImgThumb").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 19 5.5-5.5 3 3L17 13l2 2.5"/></svg>';
@@ -4253,7 +4317,7 @@
       : (d.img ? "linear-gradient(165deg, rgba(" + pc.r + "," + pc.g + "," + pc.b + ",.38), rgba(" + pc.r + "," + pc.g + "," + pc.b + ",.68))" : "#ffffff");
     h += '<div class="og-photo" style="background:' + photoBg + (simple ? ";border-color:" + edge : "") + '">';
     if(d.img){
-      h += '<img src="' + d.img + '" alt="プロフィール写真" />';
+      h += '<img src="' + esc(safeImgSrc(d.img)) + '" alt="プロフィール写真" />';
     } else if(site){
       h += '<div class="og-photo-ph"><svg viewBox="0 0 24 24" fill="#ffffff" aria-hidden="true"><circle cx="12" cy="8.2" r="4.1"/><path d="M3.8 21.2c1.4-4.3 4.4-6.4 8.2-6.4s6.8 2.1 8.2 6.4z"/></svg></div>';
     } else {
@@ -5192,6 +5256,65 @@
         .catch(function(){});
     } catch(e){ /* 取得できなくても端末内の一覧だけで続行 */ }
   }
+  /* ---------- 公開プロフィール取得（公開ページ／公開検索／お気に入り） ----------
+     profiles テーブルから「みんなの公開プロフィール」を読む側の
+     処理。書き込み系（sbSaveProfile 等）とは独立で、失敗しても
+     呼び出し側が従来動作（端末内データだけ）を続けられるよう、
+     すべての呼び出しを try/catch で包み、失敗時は空配列／null
+     を返す。行は端末内エントリと同じ形（id: "sb-<slug>"）に
+     そろえて返すので、既存の表示・検索処理がそのまま使える。 */
+  var sbPublicProfilesCache = null;
+  function sbRowToEntry(row){
+    if(!row || typeof row !== "object" || !row.data || typeof row.data !== "object") return null;
+    var slug = row.slug ? String(row.slug).trim() : "";
+    if(!slug) return null;
+    return {
+      id: "sb-" + slug.replace(/[^a-zA-Z0-9_-]/g, ""),
+      slug: slug,
+      updatedAt: row.updated_at ? (Date.parse(row.updated_at) || 0) : 0,
+      visibility: (typeof normalizeVisibility === "function") ? normalizeVisibility(row.visibility) : String(row.visibility || "private"),
+      name: row.name ? String(row.name) : "",
+      genre: row.genre ? String(row.genre) : "",
+      data: row.data,
+      _isPublic: true
+    };
+  }
+  /* 推し検索・お気に入り用: visibility="public" のプロフィールを
+     上限200件まで取得する（セッション中はキャッシュを再利用）。 */
+  function sbFetchPublicProfiles(){
+    try {
+      if(!Sb.available()) return Promise.resolve([]);
+      if(sbPublicProfilesCache) return Promise.resolve(sbPublicProfilesCache);
+      return Sb.client.from("profiles").select("*").eq("visibility", "public").limit(200)
+        .then(function(res){
+          if(!res || res.error || !Array.isArray(res.data)) return [];
+          var out = [];
+          res.data.forEach(function(row){ var en = sbRowToEntry(row); if(en) out.push(en); });
+          sbPublicProfilesCache = out;
+          return out;
+        })
+        .catch(function(){ return []; });
+    } catch(e){ return Promise.resolve([]); }
+  }
+  /* 公開プロフィールページ用: slug が一致し、visibility が
+     public または limited のプロフィールを1件取得する。
+     見つからない・private の場合は null を返す（private の行が
+     RLS で返ってきた場合も、ここで表示対象から外す）。 */
+  function sbFetchProfileBySlug(slug){
+    try {
+      var target = String(slug || "").trim().replace(/^@+/, "").toLowerCase();
+      if(!Sb.available() || !target) return Promise.resolve(null);
+      return Sb.client.from("profiles").select("*").eq("slug", target).limit(1)
+        .then(function(res){
+          if(!res || res.error || !Array.isArray(res.data) || !res.data.length) return null;
+          var en = sbRowToEntry(res.data[0]);
+          if(!en) return null;
+          if(en.visibility !== "public" && en.visibility !== "limited") return null;
+          return en;
+        })
+        .catch(function(){ return null; });
+    } catch(e){ return Promise.resolve(null); }
+  }
   /* 起動時: Supabase のセッションを復元して UI と一覧へ反映 */
   (function sbInitAuth(){
     if(!Sb.available()) return;
@@ -5411,14 +5534,16 @@
   if($("btnLogoutMypage")) $("btnLogoutMypage").addEventListener("click", authLogout);
   if($("btnLoginMypage")) $("btnLoginMypage").addEventListener("click", function(){ pendingAuthAction = null; pendingAuthLabel = ""; showAuthView("login"); });
 
+  var DEFAULT_PAGE_TITLE = document.title;
   function hideSubViews(){
-    ["mypageView", "mypageProfilesView", "mypageSheetsView", "mypageFavsView", "searchView", "searchResultsView", "searchProfileView", "termsView", "newsView", "faqView", "premiumView", "adsView", "privacyView", "contactView", "tokushoView", "authView"].forEach(function(id){
+    ["mypageView", "mypageProfilesView", "mypageSheetsView", "mypageFavsView", "searchView", "searchResultsView", "searchProfileView", "publicProfileView", "termsView", "newsView", "faqView", "premiumView", "adsView", "privacyView", "contactView", "tokushoView", "authView"].forEach(function(id){
       var el = $(id);
       if(el) el.hidden = true;
     });
   }
   function showHomeView(){
     hideSubViews();
+    document.title = DEFAULT_PAGE_TITLE;
     $("editorView").hidden = true;
     if($("sharePageView")) $("sharePageView").hidden = true;
     $("homeView").hidden = false;
@@ -5607,8 +5732,9 @@
      bottom carries the name, and a profile without a photo shows
      the pink person mark (OSHI_PHOTO_PH) centered on white. */
   function favCardHtml(id, name, img, selected){
+    var simg = safeImgSrc(img);
     return '<button type="button" class="fav-card' + (selected ? " selected" : "") + '" data-oshi-card="favs" data-fav-card data-oshi-id="' + esc(id) + '" aria-pressed="' + (selected ? "true" : "false") + '" aria-label="お気に入り：' + esc(name || "名前未入力") + '">'
-      + '<span class="fav-card-photo">' + (img ? '<img src="' + img + '" alt="" />' : OSHI_PHOTO_PH) + '</span>'
+      + '<span class="fav-card-photo">' + (simg ? '<img src="' + esc(simg) + '" alt="" />' : OSHI_PHOTO_PH) + '</span>'
       + '<span class="fav-card-name">' + esc(name || "名前未入力") + '</span></button>';
   }
   /* 布教シートの管理 list item: the detail panel itself — name,
@@ -5662,6 +5788,95 @@
     if(en.profileImg) return String(en.profileImg);
     if(en.data) return entryImg(en.data);
     return "";
+  }
+  /* ---------- お気に入り: 追加・解除（slug 保持） ----------
+     公開プロフィールのお気に入りは slug（ユーザーID）で保持する:
+     保存するエントリは { slug, id:"sb-<slug>", name, img, genre }
+     の形で、表示のたびに統合データ（端末内＋公開プロフィール）
+     から最新の名前・写真を引き直す（renderMyPage の
+     resolveFavorites）。自分の端末内プロフィールへのお気に入りは
+     今まで通り id で保持する。保存先は従来と同じ
+     "oshilink.favorites.v1"（端末内）。 */
+  function writeFavorites(arr){
+    try { window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(arr)); } catch(e){ /* localStorage unavailable: favorites simply do not persist */ }
+  }
+  function favSlugOf(en){
+    if(!en || typeof en !== "object") return "";
+    if(en.slug) return String(en.slug).trim();
+    if(en.id && String(en.id).indexOf("sb-") === 0) return String(en.id).slice(3);
+    return "";
+  }
+  /* お気に入り判定: slug を持つ同士は slug で、そうでない場合は
+     id で照合する（自分のプロフィールの従来形式と混在しても
+     二重登録にならないように）。 */
+  function favMatchesRef(en, ref){
+    if(!en || !ref) return false;
+    var es = favSlugOf(en), rs = ref.slug ? String(ref.slug).trim() : "";
+    if(es && rs) return es === rs;
+    if(ref.id && en.id) return String(en.id) === String(ref.id);
+    if(rs && en.id && String(en.id) === "sb-" + rs) return true;
+    return false;
+  }
+  function isFavoriteProfile(ref){
+    if(!ref) return false;
+    var favs = readFavorites();
+    for(var i = 0; i < favs.length; i++){ if(favMatchesRef(favs[i], ref)) return true; }
+    return false;
+  }
+  function toggleFavoriteProfile(info){
+    if(!info) return false;
+    var favs = readFavorites();
+    var idx = -1;
+    for(var i = 0; i < favs.length; i++){ if(favMatchesRef(favs[i], info)){ idx = i; break; } }
+    if(idx >= 0){
+      favs.splice(idx, 1);
+      writeFavorites(favs);
+      return false;
+    }
+    var entry = {};
+    var slug = info.slug ? String(info.slug).trim() : "";
+    if(slug) entry.slug = slug;
+    entry.id = info.id ? String(info.id) : (slug ? "sb-" + slug : "");
+    entry.name = info.name ? String(info.name) : "";
+    entry.img = info.img ? String(info.img) : "";
+    if(info.genre) entry.genre = String(info.genre);
+    favs.push(entry);
+    writeFavorites(favs);
+    return true;
+  }
+  function favToggleButtonHtml(ref){
+    var fav = isFavoriteProfile(ref);
+    return '<button type="button" class="mypage-btn fav-toggle-btn' + (fav ? " mypage-btn-primary" : "") + '" data-fav-toggle aria-pressed="' + (fav ? "true" : "false") + '">' + IC.heart + (fav ? "お気に入り済み" : "お気に入りに追加") + '</button>';
+  }
+  /* お気に入り一覧の各エントリを、統合データ（端末内プロフィール
+     ＋公開プロフィール）から引いた最新の名前・写真・ジャンルに
+     解決する。統合側に見つからない場合は、保存時に持っていた
+     スナップショット（name / img）のまま表示する。 */
+  function resolveFavorites(favs, publicEntries){
+    var locals = [];
+    try { locals = readProfiles(); } catch(e){}
+    return (favs || []).map(function(en, i){
+      var fid = en.id ? String(en.id) : ("fav" + i);
+      var slug = favSlugOf(en);
+      var name = favName(en);
+      var img = favImg(en);
+      var genre = en.genre ? String(en.genre) : (en.data && en.data.fields ? String(en.data.fields["f-genre"] || "").trim() : "");
+      var match = null;
+      locals.forEach(function(le){
+        if(match) return;
+        if(le.id === fid) match = le;
+        else if(slug && typeof sbSlugForEntry === "function" && sbSlugForEntry(le) === slug) match = le;
+      });
+      if(!match && slug && Array.isArray(publicEntries)){
+        publicEntries.forEach(function(pe){ if(!match && pe && pe.slug === slug) match = pe; });
+      }
+      if(match && match.data){
+        name = entryName(match.data) || name;
+        img = entryImg(match.data) || img;
+        if(match.data.fields) genre = String(match.data.fields["f-genre"] || "").trim() || genre;
+      }
+      return { raw: en, id: fid, slug: slug, name: name, img: img, genre: genre };
+    });
   }
   function clearSavedProfileData(){
     try { window.localStorage.removeItem(PROFILE_STORAGE_KEY); } catch(e){}
@@ -5896,31 +6111,77 @@
         if(favDetail) favDetail.innerHTML = "";
         selectedFavId = null;
       } else {
+        /* カードは統合データ（端末内＋公開プロフィール）から
+           解決した名前・写真で描く。まず端末内だけで描き、
+           公開プロフィールの取得が終わったら
+           renderFavoritesOnly で引き直す。 */
+        var resolvedFavs = resolveFavorites(favorites, sbPublicProfilesCache);
         var fgrid = "";
-        favorites.forEach(function(en, i){
-          var fid = en.id ? String(en.id) : ("fav" + i);
-          fgrid += favCardHtml(fid, favName(en), favImg(en), fid === selectedFavId);
+        resolvedFavs.forEach(function(rf){
+          fgrid += favCardHtml(rf.id, rf.name, rf.img, rf.id === selectedFavId);
         });
         favList.innerHTML = favAffiliateHtml("top", "fav-aff--top")
           + '<div class="fav-grid">' + fgrid + '</div>'
           + favAffiliateHtml("bottom", "fav-aff--bottom");
         if(favDetail){
           var fsel = null;
-          favorites.forEach(function(en, i){ if((en.id ? String(en.id) : ("fav" + i)) === selectedFavId) fsel = en; });
+          resolvedFavs.forEach(function(rf){ if(rf.id === selectedFavId) fsel = rf; });
           if(!fsel) favDetail.innerHTML = "";
           else {
             var fmeta = [];
-            var fgenre = fsel.genre || (fsel.data && fsel.data.fields ? String(fsel.data.fields["f-genre"] || "").trim() : "");
-            if(fgenre) fmeta.push(esc(fgenre));
-            favDetail.innerHTML = '<div class="oshi-detail"><div class="oshi-detail-name">' + esc(favName(fsel) || "名前未入力") + '</div>'
+            if(fsel.genre) fmeta.push(esc(fsel.genre));
+            favDetail.innerHTML = '<div class="oshi-detail"><div class="oshi-detail-name">' + esc(fsel.name || "名前未入力") + '</div>'
               + (fmeta.length ? '<div class="oshi-detail-meta">' + fmeta.join(" ・ ") + '</div>' : '') + '</div>';
           }
         }
+        scheduleFavoritesPublicRefresh();
       }
     }
     if(window.requestAnimationFrame) requestAnimationFrame(fitMpSheetThumbs);
     /* Fill any affiliate ad slots just rendered above (the
        favorites top / bottom / empty slots) with banners. */
+    if(typeof renderAdSlots === "function") renderAdSlots();
+  }
+  /* お気に入り専用画面の再描画（公開プロフィール取得後）:
+     slug で保持したお気に入りを、取得済みの公開プロフィールと
+     突き合わせて名前・写真を引き直し、カード一覧だけを描き
+     直す。取得に失敗した場合は何もしない（端末内だけで描いた
+     表示がそのまま残る）。 */
+  var favoritesPublicRefreshDone = false;
+  function scheduleFavoritesPublicRefresh(){
+    if(favoritesPublicRefreshDone) return;
+    favoritesPublicRefreshDone = true;
+    try {
+      sbFetchPublicProfiles().then(function(pub){
+        if(pub && pub.length) renderFavoritesOnly(pub);
+      }).catch(function(){});
+    } catch(e){ /* 端末内だけの表示で続行 */ }
+  }
+  function renderFavoritesOnly(publicEntries){
+    var favList = $("mypageFavList");
+    var favDetail = $("mypageFavDetail");
+    if(!favList) return;
+    var favorites = readFavorites();
+    if(!favorites.length) return;
+    var resolvedFavs = resolveFavorites(favorites, publicEntries);
+    var fgrid = "";
+    resolvedFavs.forEach(function(rf){
+      fgrid += favCardHtml(rf.id, rf.name, rf.img, rf.id === selectedFavId);
+    });
+    favList.innerHTML = favAffiliateHtml("top", "fav-aff--top")
+      + '<div class="fav-grid">' + fgrid + '</div>'
+      + favAffiliateHtml("bottom", "fav-aff--bottom");
+    if(favDetail){
+      var fsel = null;
+      resolvedFavs.forEach(function(rf){ if(rf.id === selectedFavId) fsel = rf; });
+      if(!fsel) favDetail.innerHTML = "";
+      else {
+        var fmeta = [];
+        if(fsel.genre) fmeta.push(esc(fsel.genre));
+        favDetail.innerHTML = '<div class="oshi-detail"><div class="oshi-detail-name">' + esc(fsel.name || "名前未入力") + '</div>'
+          + (fmeta.length ? '<div class="oshi-detail-meta">' + fmeta.join(" ・ ") + '</div>' : '') + '</div>';
+      }
+    }
     if(typeof renderAdSlots === "function") renderAdSlots();
   }
   /* ============================================================
@@ -6009,7 +6270,9 @@
       if(freeTxt) ptsText.push(freeTxt);
       return {
         id: item.id || ("local" + idx),
-        isLocal: true,
+        isLocal: !item._isPublic,
+        slug: item.slug ? String(item.slug) : (String(item.id || "").indexOf("sb-") === 0 ? String(item.id).slice(3) : ""),
+        data: d,
         name: String(f["f-name"] || "").trim(),
         furigana: String(f["f-furigana"] || "").trim(),
         genre: String(f["f-genre"] || "").trim(),
@@ -6040,6 +6303,8 @@
     return {
       id: o.id || ("pub" + idx),
       isLocal: false,
+      slug: o.slug ? String(o.slug) : (String(o.id || "").indexOf("sb-") === 0 ? String(o.id).slice(3) : ""),
+      data: (o.data && typeof o.data === "object") ? o.data : null,
       name: String(o.name || "").trim(),
       furigana: String(o.furigana || o.reading || "").trim(),
       genre: Array.isArray(o.genre) ? o.genre.map(function(g){ return String(g || "").trim(); }).filter(Boolean).join("・") : (Array.isArray(o.genres) ? o.genres.map(function(g){ return String(g || "").trim(); }).filter(Boolean).join("・") : String(o.genre || o.genres || "").trim()),
@@ -6061,6 +6326,57 @@
   }
   function loadSearchData(){
     return getSearchSourceArray().map(function(it, i){ return normalizeSearchItem(it, i); });
+  }
+  /* 検索対象の統合: 端末内プロフィールに、Supabase の公開
+     プロフィール（visibility="public"、上限200件）を足す。
+     重複排除は slug または ID で行い、同じ推しは端末内側を
+     優先して1件だけ残す。取得に失敗した場合は端末内だけを
+     対象に検索を続ける（呼び出し側は失敗を意識しなくてよい）。
+     公開分の元データは searchRemoteDataById に控えておき、
+     結果カードからプロフィールページを開くときに使う。 */
+  var searchRemoteDataById = {};
+  var searchRemoteSlugById = {};
+  var lastSearchData = [];
+  function loadSearchDataAsync(){
+    var local = loadSearchData();
+    try {
+      return sbFetchPublicProfiles().then(function(pubEntries){
+        try {
+          var seenId = {}, seenSlug = {};
+          local.forEach(function(p){
+            seenId[String(p.id)] = true;
+            if(p.slug) seenSlug[p.slug] = true;
+            /* 端末内でもサーバー由来（sb-<slug>）のものや、
+               ログイン中ユーザーの slug を持つものは slug を控える */
+            if(!p.slug){
+              var en = null;
+              try { en = getProfileEntry(p.id); } catch(e){}
+              if(en && typeof sbSlugForEntry === "function"){
+                var s = sbSlugForEntry(en);
+                /* ランダムな端末内ID由来の文字列は slug として扱わない:
+                   サーバー由来IDか、ログインユーザーのIDのときだけ採用 */
+                var user = null;
+                try { user = Auth.currentUser(); } catch(e){}
+                if(String(en.id).indexOf("sb-") === 0 || (user && user.userId && s === String(user.userId).toLowerCase())) seenSlug[s] = true;
+              }
+            }
+          });
+          var merged = local.slice();
+          (pubEntries || []).forEach(function(en){
+            if(!en || !en.data) return;
+            if(en.slug && seenSlug[en.slug]) return;
+            if(seenId[String(en.id)]) return;
+            var norm = normalizeSearchItem({ id: en.id, slug: en.slug, data: en.data, _isPublic: true }, merged.length);
+            searchRemoteDataById[norm.id] = en.data;
+            searchRemoteSlugById[norm.id] = en.slug || "";
+            merged.push(norm);
+            seenId[String(norm.id)] = true;
+            if(en.slug) seenSlug[en.slug] = true;
+          });
+          return merged;
+        } catch(e){ return local; }
+      }).catch(function(){ return local; });
+    } catch(e){ return Promise.resolve(local); }
   }
   function buildSearchControls(){
     var ySel = $("s-birth-year");
@@ -6175,14 +6491,28 @@
     return true;
   }
   function searchCardHtml(p){
+    var simg = safeImgSrc(p.img);
     return '<button type="button" class="fav-card" data-search-card data-search-id="' + esc(p.id) + '" aria-label="' + esc(p.name || "名前未入力") + 'のプロフィールを見る">'
-      + '<span class="fav-card-photo">' + (p.img ? '<img src="' + p.img + '" alt="" />' : OSHI_PHOTO_PH) + '</span>'
+      + '<span class="fav-card-photo">' + (simg ? '<img src="' + esc(simg) + '" alt="" />' : OSHI_PHOTO_PH) + '</span>'
       + '<span class="fav-card-name">' + esc(p.name || "名前未入力") + '</span></button>';
   }
+  /* 検索実行: まず端末内だけで即座に描き、Supabase の公開
+     プロフィール取得が終わったら統合結果で描き直す。取得に
+     失敗した場合は端末内だけの結果がそのまま残る。 */
   function renderSearchResults(){
     var box = $("searchResults");
     if(!box) return;
-    var all = loadSearchData();
+    paintSearchResults(loadSearchData());
+    try {
+      loadSearchDataAsync().then(function(all){
+        paintSearchResults(all);
+      }).catch(function(){ /* 端末内だけの結果で続行 */ });
+    } catch(e){ /* 端末内だけの結果で続行 */ }
+  }
+  function paintSearchResults(all){
+    var box = $("searchResults");
+    if(!box) return;
+    lastSearchData = all;
     var c = readSearchCriteria();
     var results = all.filter(function(p){ return matchesSearch(p, c); });
     var countEl = $("searchResultCount");
@@ -6292,9 +6622,10 @@
     el.style.setProperty("--purple", light);
     el.style.setProperty("--faint", isBlack ? "#ffffff" : lightenHex(acc, 0.5));
   }
-  /* 完成プレビュー末尾と同じシェアボックス（このページ用） */
-  function searchProfileShareBoxHtml(name){
-    var sUrl = getShareUrl(name);
+  /* 完成プレビュー末尾と同じシェアボックス（このページ用）。
+     slug があるプロフィールは ?u=<slug> の共有URLになる。 */
+  function searchProfileShareBoxHtml(name, slug){
+    var sUrl = getShareUrl(name, slug ? slug : undefined);
     return '<div class="share-box"><h3>このページをシェア</h3>'
       + (sUrl ? '<p class="share-url"><b>推しプロフィールのURL</b>' + esc(sUrl) + '</p>' : '')
       + '<div class="share-row">'
@@ -6310,8 +6641,9 @@
   }
   var SEARCH_PV_PHOTO_PH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 19 5.5-5.5 3 3L17 13l2 2.5"/></svg>プロフィール画像';
   /* 保存済みプロフィール（collectProfileData の形）から、
-     完成プレビュー（renderPreview）と同構成のHTMLを組み立てる */
-  function buildSearchProfileHtmlFromData(data){
+     完成プレビュー（renderPreview）と同構成のHTMLを組み立てる。
+     slug は共有URL（?u=<slug>）の組み立てに使う。 */
+  function buildSearchProfileHtmlFromData(data, slug){
     var f = data.fields || {};
     var ck = data.checks || {};
     var snsData = data.sns || {};
@@ -6335,7 +6667,7 @@
     }
     var html = '<div class="pv-hero">';
     if(data.profileImg){
-      html += '<img class="pv-img" src="' + data.profileImg + '" alt="プロフィール画像" />';
+      html += '<img class="pv-img" src="' + esc(safeImgSrc(data.profileImg)) + '" alt="プロフィール画像" />';
     } else {
       html += '<div class="pv-img-ph">' + SEARCH_PV_PHOTO_PH + '</div>';
     }
@@ -6431,7 +6763,7 @@
       if(!r || r.vis === "private") return;
       if(!String(r.title || "").trim() && !String(r.comment || "").trim() && !r.img && !normUrl(r.sns)) return;
       rHtml += '<div class="pv-rec">'
-        + (r.img ? '<img src="' + r.img + '" alt="" />' : '')
+        + (safeImgSrc(r.img) ? '<img src="' + esc(safeImgSrc(r.img)) + '" alt="" />' : '')
         + (String(r.title || "").trim() ? '<div class="r-t">' + esc(r.title) + '</div>' : '')
         + (r.date ? '<div class="r-d">' + esc(String(r.date).replace(/-/g, "/")) + '</div>' : '')
         + (String(r.comment || "").trim() ? '<div class="r-c">' + esc(r.comment) + '</div>' : '')
@@ -6445,7 +6777,7 @@
     goods.forEach(function(g){
       if(!g || !String(g.name || "").trim()) return;
       var u = normUrl(g.url);
-      gHtml += '<div class="pv-goods"><div class="g-img">' + (g.img ? '<img src="' + g.img + '" alt="" />' : esc(g.cat)) + '</div><div>'
+      gHtml += '<div class="pv-goods"><div class="g-img">' + (safeImgSrc(g.img) ? '<img src="' + esc(safeImgSrc(g.img)) + '" alt="" />' : esc(g.cat)) + '</div><div>'
         + '<div class="g-t">' + esc(g.name) + '<span class="g-cat">' + esc(g.cat) + '</span>' + (g.ad && u ? '<span class="g-ad">広告</span>' : '') + '</div>'
         + (String(g.desc || "").trim() ? '<div class="g-d">' + esc(g.desc) + '</div>' : '')
         + (u ? '<a class="g-buy" href="' + esc(u) + '" target="_blank" rel="noopener noreferrer sponsored">購入ページへ</a>' : '')
@@ -6455,7 +6787,7 @@
     /* official SNS / external links */
     if(snsItems) html += secHead(IC.other, "推しの公式SNS・外部リンク") + '<div class="pv-snslist">' + snsItems + '</div></div>';
     /* share */
-    html += searchProfileShareBoxHtml(name);
+    html += searchProfileShareBoxHtml(name, slug);
     /* この推しのアルバム（完成プレビューと同じ棚） */
     var shelfSongs = songs.filter(function(s){ return s && String(s.title || "").trim(); });
     if(shelfSongs.length){
@@ -6476,7 +6808,7 @@
   function buildSearchProfileHtmlFromItem(p){
     var html = '<div class="pv-hero">';
     if(p.img){
-      html += '<img class="pv-img" src="' + p.img + '" alt="プロフィール画像" />';
+      html += '<img class="pv-img" src="' + esc(safeImgSrc(p.img)) + '" alt="プロフィール画像" />';
     } else {
       html += '<div class="pv-img-ph">' + SEARCH_PV_PHOTO_PH + '</div>';
     }
@@ -6509,23 +6841,32 @@
     }
     (p.tags || []).forEach(function(t){ if(!seenTags[t]) ptHtml += '<div class="pt-card"><span class="tag">' + esc(t) + '</span></div>'; });
     if(ptHtml) html += secHead(IC.heart, "推しポイント") + ptHtml + '</div>';
-    html += searchProfileShareBoxHtml(p.name || "");
+    html += searchProfileShareBoxHtml(p.name || "", p.slug || "");
     return html;
   }
-  /* 検索結果のカードから、その推しのプロフィールページを開く */
+  /* 検索結果のカードから、その推しのプロフィールページを開く。
+     対象は統合データ（端末内＋公開プロフィール）: 公開分は
+     searchRemoteDataById に控えた元データから、検索結果から
+     開くプロフィール画面と同じ見た目で表示する。 */
+  var searchProfileSlug = "";
+  var searchCurrentFavInfo = null;
   function showSearchProfilePage(id){
-    var all = loadSearchData();
+    var all = (lastSearchData && lastSearchData.length) ? lastSearchData : loadSearchData();
     var p = null;
     all.forEach(function(it){ if(String(it.id) === String(id)) p = it; });
+    if(!p && searchRemoteDataById[String(id)]){
+      p = normalizeSearchItem({ id: String(id), slug: searchRemoteSlugById[String(id)] || "", data: searchRemoteDataById[String(id)], _isPublic: true }, 0);
+    }
     if(!p) return;
     var root = $("searchPvRoot");
     if(!root) return;
     var entry = p.isLocal ? getProfileEntry(p.id) : null;
-    var data = entry && entry.data ? entry.data : null;
+    var data = entry && entry.data ? entry.data : (p.data || searchRemoteDataById[String(p.id)] || null);
     searchProfileName = p.name || (data && data.fields ? String(data.fields["f-name"] || "").trim() : "");
+    searchProfileSlug = p.slug || searchRemoteSlugById[String(p.id)] || "";
     var design = "simple", designColor = "#ef6aa5";
     if(data){
-      root.innerHTML = buildSearchProfileHtmlFromData(data);
+      root.innerHTML = buildSearchProfileHtmlFromData(data, searchProfileSlug);
       if(data.design === "simple" || data.design === "check" || data.design === "site") design = data.design;
       if(typeof data.designColor === "string" && /^#[0-9a-f]{6}$/i.test(data.designColor)) designColor = data.designColor;
     } else {
@@ -6533,8 +6874,21 @@
     }
     var titleEl = $("searchProfileTitle");
     if(titleEl) titleEl.textContent = searchProfileName ? searchProfileName + "のプロフィール" : "推しプロフィール";
+    /* お気に入り登録: 公開プロフィールは slug で保持、自分の
+       端末内プロフィールは今まで通り id で保持する。 */
+    searchCurrentFavInfo = {
+      slug: searchProfileSlug,
+      id: String(p.id),
+      name: searchProfileName,
+      img: p.img || (data ? entryImg(data) : ""),
+      genre: p.genre || ""
+    };
     var actions = $("searchProfileActions");
-    if(actions) actions.innerHTML = p.isLocal ? '<div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-primary" data-search-edit="' + esc(p.id) + '">編集する</button></div>' : "";
+    if(actions){
+      actions.innerHTML = '<div class="mypage-item-actions">' + favToggleButtonHtml(searchCurrentFavInfo)
+        + (p.isLocal ? '<button type="button" class="mypage-btn mypage-btn-primary" data-search-edit="' + esc(p.id) + '">編集する</button>' : "")
+        + '</div>';
+    }
     closeMenuPanel();
     hideSubViews();
     $("homeView").hidden = true;
@@ -6545,6 +6899,121 @@
     window.scrollTo(0, 0);
     scheduleSnsEmbeds();
   }
+  /* ---------- 公開プロフィールページ（?u=<slug>） ----------
+     URL に ?u=<slug> が付いて開かれたら、Supabase の profiles
+     テーブルから slug が一致し visibility が public または
+     limited のプロフィールを1件取得して、検索結果から開く
+     プロフィール画面と同じ見た目（保存デザインと色テーマを
+     反映した完成プロフィール）で単独ページとして表示する。
+     見つからない・private の場合は案内画面を出す。取得の
+     失敗時も案内画面に倒れる（try/catch で包み、従来表示を
+     壊さない）。 */
+  var publicProfileSlug = "";
+  var publicProfileName = "";
+  var publicCurrentFavInfo = null;
+  function showPublicNotFound(){
+    var loading = $("publicProfileLoading"); if(loading) loading.hidden = true;
+    var root = $("publicPvRoot"); if(root){ root.innerHTML = ""; root.hidden = true; }
+    var actions = $("publicProfileActions"); if(actions) actions.innerHTML = "";
+    var nf = $("publicNotFound"); if(nf) nf.hidden = false;
+    var titleEl = $("publicProfileTitle"); if(titleEl) titleEl.textContent = "推しプロフィール";
+    document.title = "プロフィールが見つかりません | 推しLink";
+  }
+  function showPublicProfilePage(slug){
+    var target = String(slug || "").trim().replace(/^@+/, "").toLowerCase();
+    closeMenuPanel();
+    hideSubViews();
+    $("homeView").hidden = true;
+    $("editorView").hidden = true;
+    if($("sharePageView")) $("sharePageView").hidden = true;
+    var view = $("publicProfileView");
+    if(!view) return;
+    view.hidden = false;
+    var loading = $("publicProfileLoading"); if(loading) loading.hidden = false;
+    var nf = $("publicNotFound"); if(nf) nf.hidden = true;
+    var root = $("publicPvRoot"); if(root){ root.innerHTML = ""; root.hidden = true; }
+    var actions = $("publicProfileActions"); if(actions) actions.innerHTML = "";
+    window.scrollTo(0, 0);
+    try {
+      sbFetchProfileBySlug(target).then(function(entry){
+        if(!entry || !entry.data){
+          showPublicNotFound();
+          return;
+        }
+        publicProfileSlug = entry.slug || target;
+        var data = entry.data;
+        publicProfileName = entryName(data) || entry.name || "";
+        document.title = (publicProfileName ? publicProfileName + "の推しプロフィール" : "推しプロフィール") + " | 推しLink";
+        var titleEl = $("publicProfileTitle");
+        if(titleEl) titleEl.textContent = publicProfileName ? publicProfileName + "のプロフィール" : "推しプロフィール";
+        if(loading) loading.hidden = true;
+        if(root){
+          root.innerHTML = buildSearchProfileHtmlFromData(data, publicProfileSlug);
+          root.hidden = false;
+          var design = "simple", designColor = "#ef6aa5";
+          if(data.design === "simple" || data.design === "check" || data.design === "site") design = data.design;
+          if(typeof data.designColor === "string" && /^#[0-9a-f]{6}$/i.test(data.designColor)) designColor = data.designColor;
+          applySearchPvTheme(root, design, designColor);
+        }
+        publicCurrentFavInfo = {
+          slug: publicProfileSlug,
+          id: entry.id,
+          name: publicProfileName,
+          img: entryImg(data),
+          genre: data.fields ? String(data.fields["f-genre"] || "").trim() : ""
+        };
+        if(actions) actions.innerHTML = '<div class="mypage-item-actions">' + favToggleButtonHtml(publicCurrentFavInfo) + '</div>';
+        scheduleSnsEmbeds();
+      }).catch(function(){ showPublicNotFound(); });
+    } catch(e){ showPublicNotFound(); }
+  }
+  /* 起動時に ?u=<slug> を確認する。通常表示（パラメータなし）
+     には一切影響しない。 */
+  function checkPublicProfileParam(){
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      var u = params.get("u");
+      if(u && String(u).trim()){
+        showPublicProfilePage(u);
+        return true;
+      }
+    } catch(e){ /* パラメータが読めなくても通常表示で続行 */ }
+    return false;
+  }
+  if($("publicProfileView")) $("publicProfileView").addEventListener("click", function(e){
+    var favBtn = e.target.closest("[data-fav-toggle]");
+    if(favBtn){
+      if(publicCurrentFavInfo){
+        var nowFav = toggleFavoriteProfile(publicCurrentFavInfo);
+        var actions = $("publicProfileActions");
+        if(actions) actions.innerHTML = '<div class="mypage-item-actions">' + favToggleButtonHtml(publicCurrentFavInfo) + '</div>';
+        toast(nowFav ? "お気に入りに追加しました" : "お気に入りを解除しました");
+      }
+      return;
+    }
+    var b = e.target.closest("[data-share]");
+    if(!b) return;
+    var kind = b.getAttribute("data-share");
+    var name = publicProfileName;
+    var text = shareText(name);
+    var url = getShareUrl(name, publicProfileSlug ? publicProfileSlug : undefined);
+    var title = shareTitle(name);
+    if(kind === "x"){
+      window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) + (url ? "&url=" + encodeURIComponent(url) : ""), "_blank", "noopener");
+    } else if(kind === "line"){
+      window.open("https://line.me/R/msg/text/?" + encodeURIComponent(url ? text + "\n" + url : text), "_blank", "noopener");
+    } else if(kind === "copy"){
+      if(url) copyTextToClipboard(url, "URLをコピーしました");
+    } else if(kind === "other"){
+      var payload = url ? { title:title, text:text, url:url } : { title:title, text:text };
+      var fb = url || text;
+      if(!shareViaWebApi(payload, fb, url ? "URLをコピーしました" : "共有文をコピーしました")){
+        copyTextToClipboard(fb, url ? "この端末では直接共有できないため、URLをコピーしました" : "共有文をコピーしました");
+      }
+    } else if(kind === "qr"){
+      if(url) openQrModal(url, url);
+    }
+  });
   function clearSearch(){
     searchSelectedTags = [];
     searchSelectedGenres = [];
@@ -6626,6 +7095,21 @@
     /* プロフィールページ内: 編集ボタンとシェアボタン
        （シェアは表示中の推しの名前で組み立てる） */
     $("searchProfileView").addEventListener("click", function(e){
+      var favBtn = e.target.closest("[data-fav-toggle]");
+      if(favBtn){
+        if(searchCurrentFavInfo){
+          var nowFav = toggleFavoriteProfile(searchCurrentFavInfo);
+          var actions = $("searchProfileActions");
+          if(actions){
+            var editHtml = "";
+            var editBtn0 = actions.querySelector("[data-search-edit]");
+            if(editBtn0) editHtml = '<button type="button" class="mypage-btn mypage-btn-primary" data-search-edit="' + esc(editBtn0.getAttribute("data-search-edit")) + '">編集する</button>';
+            actions.innerHTML = '<div class="mypage-item-actions">' + favToggleButtonHtml(searchCurrentFavInfo) + editHtml + '</div>';
+          }
+          toast(nowFav ? "お気に入りに追加しました" : "お気に入りを解除しました");
+        }
+        return;
+      }
       var editBtn = e.target.closest("[data-search-edit]");
       if(editBtn){ openEditor("edit", editBtn.getAttribute("data-search-edit")); return; }
       var b = e.target.closest("[data-share]");
@@ -6633,7 +7117,7 @@
       var kind = b.getAttribute("data-share");
       var name = searchProfileName;
       var text = shareText(name);
-      var url = getShareUrl(name);
+      var url = getShareUrl(name, searchProfileSlug ? searchProfileSlug : undefined);
       var title = shareTitle(name);
       if(kind === "x"){
         window.open("https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) + (url ? "&url=" + encodeURIComponent(url) : ""), "_blank", "noopener");
@@ -7278,7 +7762,7 @@
         b.setAttribute("aria-pressed", String(state.pointOrder.indexOf(b.getAttribute("data-tag")) >= 0));
       });
       if(state.profileImg){
-        $("imgThumb").innerHTML = '<img src="' + state.profileImg + '" alt="選択したプロフィール画像" />';
+        $("imgThumb").innerHTML = '<img src="' + esc(safeImgSrc(state.profileImg)) + '" alt="選択したプロフィール画像" />';
         $("btnPhotoClear").hidden = false;
       } else {
         $("imgThumb").innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="m5 19 5.5-5.5 3 3L17 13l2 2.5"/></svg>';
@@ -7553,6 +8037,9 @@
   renderGoods();
   renderRecords();
   renderAll();
+  /* ?u=<slug> で開かれた場合は公開プロフィールページを表示する
+     （パラメータがなければ通常のトップ表示のまま）。 */
+  checkPublicProfileParam();
 })();
 </script>
 
