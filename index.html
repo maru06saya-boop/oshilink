@@ -2388,7 +2388,7 @@
     return "";
   }
   var toastTimer = null;
-  function toast(msg){ var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove("show"); }, 2400); }
+  function toast(msg, holdMs){ var t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.classList.remove("show"); }, holdMs || 2400); }
 
   /* ---------- zodiac ---------- */
   function zodiacOf(m, d){
@@ -5189,15 +5189,40 @@
         data: d,
         owner_id: user.id
       };
-      Sb.client.from("profiles").select("id").eq("owner_id", user.id).eq("slug", slug).limit(1)
+      var doSave = function(){
+        Sb.client.from("profiles").select("id").eq("owner_id", user.id).eq("slug", slug).limit(1)
+          .then(function(res){
+            if(res && !res.error && res.data && res.data.length){
+              return Sb.client.from("profiles").update(row).eq("id", res.data[0].id);
+            }
+            return Sb.client.from("profiles").insert(row);
+          })
+          .then(function(){ /* 保存の成否で画面は止めない（端末内保存が正） */ })
+          .catch(function(){});
+      };
+      /* 重複チェック: サーバー保存の前に、その slug（ユーザーID）
+         が他の人のプロフィールで既に使われていないか確認する。
+         使われていたら案内を画面に出してサーバー保存は行わない
+         （端末内保存は呼び出し側で済んでいるので、そのまま
+         続く）。自分の既存プロフィール（同じ slug・同じ owner）
+         の更新は今まで通り保存する。チェックの通信に失敗した
+         場合は、従来通り保存を試みる（失敗しても端末内動作は
+         続ける）。 */
+      Sb.client.from("profiles").select("id, owner_id").eq("slug", slug).limit(5)
         .then(function(res){
-          if(res && !res.error && res.data && res.data.length){
-            return Sb.client.from("profiles").update(row).eq("id", res.data[0].id);
+          if(res && !res.error && Array.isArray(res.data)){
+            var takenByOther = false;
+            res.data.forEach(function(r){
+              if(r && String(r.owner_id || "") !== String(user.id)) takenByOther = true;
+            });
+            if(takenByOther){
+              if(typeof toast === "function") toast("このユーザーIDは既に使われています。別のIDに変えてください。", 5000);
+              return;
+            }
           }
-          return Sb.client.from("profiles").insert(row);
+          doSave();
         })
-        .then(function(){ /* 保存の成否で画面は止めない（端末内保存が正） */ })
-        .catch(function(){});
+        .catch(function(){ doSave(); });
     } catch(e){ /* Supabase 失敗時も端末内保存だけで続行 */ }
   }
   function sbDeleteProfile(entry){
