@@ -726,6 +726,31 @@
   a.btn-save{text-decoration:none}
   .admin-sec-note{margin:12px 0 0; font-size:11.5px; color:var(--faint); line-height:1.7}
   .admin-notice-list{margin-top:18px; border-top:1px solid var(--border-soft)}
+  /* contact form (お問い合わせページ): ハニーポット欄は人間には
+     見えない位置に置き、画面にも読み上げにも出さない */
+  .hp-field{position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden}
+  .contact-done{margin:0; border:1.5px solid var(--border); background:var(--surface-2); border-radius:14px; padding:14px; font-size:13.5px; font-weight:700; color:var(--text); line-height:1.75}
+  .contact-done b{color:var(--pink)}
+  /* admin inbox (お問い合わせ・削除申請): 種別と対応状態のバッジ、
+     送信者情報と本文の並び */
+  .admin-inquiry-list{margin-top:6px}
+  .inq-item{padding:16px 0; border-bottom:1px solid var(--border-soft)}
+  .inq-item:first-child{padding-top:6px}
+  .inq-item:last-child{border-bottom:none; padding-bottom:2px}
+  .inq-badges{display:flex; flex-wrap:wrap; gap:6px; align-items:center}
+  .inq-badge{flex:none; display:inline-flex; align-items:center; font-size:11px; font-weight:900; line-height:1.5; border-radius:999px; padding:2px 10px; white-space:nowrap}
+  .inq-badge--contact{background:var(--pink-soft); border:1px solid var(--border-soft); color:var(--pink)}
+  .inq-badge--deletion{background:#c81e4a; color:#fff}
+  .inq-badge--other{background:var(--surface-3); border:1px solid var(--border-soft); color:var(--dim)}
+  .inq-badge--unhandled{background:var(--pink); color:#fff}
+  .inq-badge--handled{background:#fff; border:1.5px solid var(--border); color:var(--dim); padding:1px 9px}
+  .inq-meta{margin:9px 0 0; font-size:13px; color:var(--dim); line-height:1.7; overflow-wrap:anywhere}
+  .inq-meta b{color:var(--text)}
+  .inq-date{color:var(--faint); font-size:12px}
+  .inq-message{margin:8px 0 0; font-size:13.5px; color:var(--text); line-height:1.8; white-space:pre-wrap; overflow-wrap:anywhere}
+  .inq-target{margin:8px 0 0; font-size:12.5px; color:var(--dim); line-height:1.7; overflow-wrap:anywhere}
+  .inq-target a{color:var(--pink); font-weight:700}
+  a.mypage-btn{text-decoration:none}
   .pv-video{display:block; text-decoration:none; border:1px solid var(--border-soft); border-radius:13px; overflow:hidden; margin-bottom:10px; background:var(--surface-3)}
   .pv-video .thumb{position:relative; aspect-ratio:16/9; background:#170510; display:flex; align-items:center; justify-content:center}
   .pv-video .thumb img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
@@ -2225,6 +2250,7 @@
         <li>曲を検索するとき、入力した検索キーワードが、曲情報を取得するためにApple（iTunes Search API）へ送信されます。</li>
         <li>SNS・動画サイト・Apple Music・Amazon・楽天など外部サービスへのリンクを開くと、リンク先のサービスへアクセスします。リンク先での情報の取り扱いは、各サービスの規約・ポリシーが適用されます。</li>
         <li>Googleログインを選んだ場合、認証のためにGoogleから名前・メールアドレスなどの情報を、Supabaseを経由して取得します。取得した情報はログイン（本人確認）の目的でのみ利用し、販売したり、広告に利用したりすることはありません。</li>
+        <li>お問い合わせフォームから送信された名前・メールアドレス・お問い合わせ内容（削除申請の場合は、対象プロフィールのURLを含みます）は、Supabaseに保存されます。これらの情報は、返信と対応の目的でのみ利用し、それ以外の目的で使ったり、第三者へ提供したりすることはありません。</li>
         <li>上記以外の目的で、入力した内容や保存データを外部へ送信することはありません。</li>
       </ul>
     </div>
@@ -2271,6 +2297,49 @@
         <li>お使いの端末・ブラウザ（分かる範囲で大丈夫です）</li>
       </ul>
     </div>
+  </section>
+
+  <section class="fcard" aria-label="お問い合わせフォーム">
+    <h2>お問い合わせフォーム</h2>
+    <p class="aff-lead">下のフォームから送信できます。返信が必要な場合は、入力いただいたメールアドレスへご連絡します。</p>
+    <div class="legal-note" style="margin:0 0 16px">
+      <p>自分のプロフィールの削除は、マイページのプロフィール管理から自分で行えます。削除申請は、他人のプロフィールに関する権利者からのご連絡など、自分では削除できない場合にお使いください。</p>
+    </div>
+    <p class="contact-done" id="contactDone" role="status" aria-live="polite" hidden><b>送信しました。</b><br />お問い合わせありがとうございます。内容を確認のうえ、必要な場合は入力いただいたメールアドレスへ返信します。</p>
+    <form id="contactForm" novalidate>
+      <p class="auth-error" id="contactError" hidden></p>
+      <div class="field">
+        <label for="contactKind">種別<span class="req">必須</span></label>
+        <select id="contactKind">
+          <option value="contact" selected>お問い合わせ</option>
+          <option value="deletion">削除申請</option>
+          <option value="other">その他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="contactName">お名前（任意）</label>
+        <input type="text" id="contactName" placeholder="お名前" autocomplete="name" />
+      </div>
+      <div class="field">
+        <label for="contactEmail">メールアドレス<span class="req">必須</span></label>
+        <input type="email" id="contactEmail" placeholder="返信を受け取るメールアドレス" autocomplete="email" />
+        <p class="hint">返信先として使います。間違いがないかご確認ください。</p>
+      </div>
+      <div class="field" id="contactTargetField" hidden>
+        <label for="contactTargetUrl">対象プロフィールのURL<span class="req">必須</span></label>
+        <input type="url" id="contactTargetUrl" placeholder="https://oshilink-official.github.io/oshilink/?u=…" autocomplete="off" />
+        <p class="hint">削除を希望するプロフィールのページのURLを貼ってください。</p>
+      </div>
+      <div class="field">
+        <label for="contactMessage">内容<span class="req">必須</span></label>
+        <textarea id="contactMessage" maxlength="2000" placeholder="お問い合わせの内容を入力してください"></textarea>
+        <p class="hint"><span id="contactMsgCount">0</span> / 2000字</p>
+      </div>
+      <div class="hp-field" aria-hidden="true">
+        <label>この欄は入力しないでください<input type="text" id="contactHp" name="website" tabindex="-1" autocomplete="off" /></label>
+      </div>
+      <button type="submit" class="btn-save" id="contactSubmit" style="margin-top:4px">送信する</button>
+    </form>
   </section>
 </div>
 
@@ -2374,6 +2443,13 @@
     <button type="button" class="btn-save" data-admin-post-notice style="margin-top:4px">投稿する</button>
     <p class="aff-feedback" id="adminNoticeFeedback" role="status" aria-live="polite" hidden>✓ 投稿しました</p>
     <div class="admin-notice-list" id="adminNoticeList"></div>
+  </section>
+
+  <section class="fcard" aria-label="お問い合わせ・削除申請">
+    <h2>お問い合わせ・削除申請</h2>
+    <p class="aff-lead">お問い合わせフォームから届いた内容です。新しい順に表示しています。「メールで返信」を押すと、自分のメールアプリが宛先・件名・元のお問い合わせ内容の引用入りで開きます。</p>
+    <p class="auth-error" id="adminInquiryError" hidden></p>
+    <div class="admin-inquiry-list" id="adminInquiryList"></div>
   </section>
 </div>
 
@@ -5475,6 +5551,7 @@
     if(aEl && document.activeElement !== aEl) aEl.value = aff.amazonTag;
     if(rEl && document.activeElement !== rEl) rEl.value = aff.rakutenId;
     renderAdminNotices();
+    renderAdminInquiries();
   }
   function renderAdminNotices(){
     var box = $("adminNoticeList");
@@ -5517,6 +5594,131 @@
         return { ok: !(res && res.error) };
       }).catch(function(){ return { ok:false }; });
     } catch(e){ return Promise.resolve({ ok:false }); }
+  }
+  /* ---------- お問い合わせ・削除申請（inquiries テーブル） ----------
+     送信は誰でも可（insert のみ許可）。閲覧・対応状態の更新・
+     削除は運営者（admins 名簿）のみ許可され、RLS でも制限
+     されている。Supabase に接続できない環境では各関数が失敗を
+     返し、呼び出し側がエラーを表示するだけで、サイトの他の
+     動作には影響させない。 */
+  var INQUIRY_KIND_LABELS = { contact:"お問い合わせ", deletion:"削除申請", other:"その他" };
+  function inquiryKindLabel(kind){
+    return INQUIRY_KIND_LABELS[String(kind || "")] || "お問い合わせ";
+  }
+  function sbSubmitInquiry(data){
+    if(!Sb.available()) return Promise.resolve({ ok:false });
+    try {
+      return Sb.client.from("inquiries").insert({
+        kind: data.kind,
+        name: data.name,
+        email: data.email,
+        target_url: data.targetUrl,
+        message: data.message
+      }).then(function(res){
+        return { ok: !(res && res.error) };
+      }).catch(function(){ return { ok:false }; });
+    } catch(e){ return Promise.resolve({ ok:false }); }
+  }
+  function sbFetchInquiries(){
+    if(!Sb.available()) return Promise.resolve(null);
+    try {
+      return Sb.client.from("inquiries").select("id, kind, name, email, target_url, message, handled, created_at").order("created_at", { ascending:false }).then(function(res){
+        if(!res || res.error || !Array.isArray(res.data)) return null;
+        return res.data;
+      }).catch(function(){ return null; });
+    } catch(e){ return Promise.resolve(null); }
+  }
+  function sbSetInquiryHandled(id, handled){
+    if(!Sb.available()) return Promise.resolve({ ok:false });
+    try {
+      return Sb.client.from("inquiries").update({ handled: !!handled }).eq("id", String(id || "")).then(function(res){
+        return { ok: !(res && res.error) };
+      }).catch(function(){ return { ok:false }; });
+    } catch(e){ return Promise.resolve({ ok:false }); }
+  }
+  function sbDeleteInquiry(id){
+    if(!Sb.available()) return Promise.resolve({ ok:false });
+    try {
+      return Sb.client.from("inquiries").delete().eq("id", String(id || "")).then(function(res){
+        return { ok: !(res && res.error) };
+      }).catch(function(){ return { ok:false }; });
+    } catch(e){ return Promise.resolve({ ok:false }); }
+  }
+  function inquiryDateTimeText(iso){
+    var d = new Date(iso || "");
+    if(isNaN(d.getTime())) return "";
+    var mm = d.getMinutes();
+    return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日 " + d.getHours() + ":" + (mm < 10 ? "0" : "") + mm;
+  }
+  /* 「メールで返信」の mailto リンク: 宛先は送信者のメール
+     アドレス、件名と本文には元のお問い合わせ内容の引用を
+     セットする。 */
+  function inquiryMailtoHref(n){
+    var kind = inquiryKindLabel(n && n.kind);
+    var subject = "【推しLink】" + kind + "への返信";
+    var lines = [
+      "お問い合わせありがとうございます。",
+      "",
+      "",
+      "――――――――――",
+      "【元のお問い合わせ内容】",
+      "種別：" + kind,
+      "お名前：" + (String((n && n.name) || "") || "（未入力）"),
+      "日時：" + inquiryDateTimeText(n && n.created_at)
+    ];
+    if(String((n && n.target_url) || "")) lines.push("対象プロフィールのURL：" + String(n.target_url));
+    lines.push("内容：");
+    lines.push(String((n && n.message) || ""));
+    return "mailto:" + encodeURIComponent(String((n && n.email) || ""))
+      + "?subject=" + encodeURIComponent(subject)
+      + "&body=" + encodeURIComponent(lines.join("\n"));
+  }
+  function inquiryItemHtml(n){
+    var id = esc(String(n.id || ""));
+    var kind = String(n.kind || "contact");
+    var handled = !!n.handled;
+    var name = String(n.name || "");
+    var email = String(n.email || "");
+    var target = String(n.target_url || "");
+    var html = '<article class="inq-item">'
+      + '<div class="inq-badges"><span class="inq-badge inq-badge--' + esc(kind) + '">' + esc(inquiryKindLabel(kind)) + "</span>"
+      + (handled
+        ? '<span class="inq-badge inq-badge--handled">対応済み</span>'
+        : '<span class="inq-badge inq-badge--unhandled">未対応</span>')
+      + "</div>"
+      + '<p class="inq-meta"><b>' + esc(name || "（名前なし）") + "</b>　" + esc(email)
+      + '<br /><span class="inq-date">' + esc(inquiryDateTimeText(n.created_at)) + "</span></p>"
+      + '<p class="inq-message">' + esc(String(n.message || "")) + "</p>";
+    if(target){
+      var safeTarget = normUrl(target);
+      html += '<p class="inq-target">対象プロフィールのURL：'
+        + (safeTarget ? '<a href="' + esc(safeTarget) + '" target="_blank" rel="noopener noreferrer">' + esc(target) + "</a>" : esc(target))
+        + "</p>";
+    }
+    html += '<div class="mypage-item-actions">'
+      + '<a class="mypage-btn mypage-btn-primary" href="' + inquiryMailtoHref(n) + '">メールで返信</a>'
+      + '<button type="button" class="mypage-btn" data-admin-inquiry-toggle="' + id + '" data-inquiry-handled="' + (handled ? "1" : "0") + '">' + (handled ? "未対応に戻す" : "対応済みにする") + "</button>"
+      + '<button type="button" class="mypage-btn mypage-btn-danger" data-admin-inquiry-delete="' + id + '">削除する</button>'
+      + "</div>"
+      + '<div class="mypage-confirm" data-admin-inquiry-confirm="' + id + '" hidden><p>このお問い合わせを削除しますか？</p><div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-danger" data-admin-inquiry-delete-confirm="' + id + '">削除する</button><button type="button" class="mypage-btn" data-admin-inquiry-delete-cancel>キャンセル</button></div></div>'
+      + "</article>";
+    return html;
+  }
+  function renderAdminInquiries(){
+    var box = $("adminInquiryList");
+    if(!box) return;
+    box.innerHTML = '<p class="news-empty">読み込み中…</p>';
+    sbFetchInquiries().then(function(rows){
+      if(!rows){
+        box.innerHTML = '<p class="news-empty">お問い合わせを取得できませんでした。時間をおいてもう一度お試しください。</p>';
+        return;
+      }
+      if(!rows.length){
+        box.innerHTML = '<p class="news-empty">届いたお問い合わせはまだありません。</p>';
+        return;
+      }
+      box.innerHTML = rows.map(inquiryItemHtml).join("");
+    });
   }
   /* ---------- profiles テーブル連携 ----------
      slug: そのプロフィールのユーザーID（アカウントのユーザー
@@ -8127,8 +8329,140 @@
       });
       return;
     }
+    var inqToggle = e.target.closest("[data-admin-inquiry-toggle]");
+    if(inqToggle){
+      var inqId = inqToggle.getAttribute("data-admin-inquiry-toggle");
+      var nextHandled = inqToggle.getAttribute("data-inquiry-handled") !== "1";
+      inqToggle.disabled = true;
+      sbSetInquiryHandled(inqId, nextHandled).then(function(result){
+        if(!result || !result.ok){
+          inqToggle.disabled = false;
+          toast("状態の変更に失敗しました。時間をおいてもう一度お試しください。");
+          return;
+        }
+        renderAdminInquiries();
+        toast(nextHandled ? "対応済みにしました" : "未対応に戻しました");
+      });
+      return;
+    }
+    var inqDelBtn = e.target.closest("[data-admin-inquiry-delete]");
+    if(inqDelBtn){
+      document.querySelectorAll("[data-admin-inquiry-confirm]").forEach(function(b){ b.hidden = true; });
+      var inqDelId = inqDelBtn.getAttribute("data-admin-inquiry-delete");
+      var inqDelBox = document.querySelector('[data-admin-inquiry-confirm="' + inqDelId + '"]');
+      if(inqDelBox) inqDelBox.hidden = false;
+      return;
+    }
+    var inqCancelBtn = e.target.closest("[data-admin-inquiry-delete-cancel]");
+    if(inqCancelBtn){
+      var inqCBox = inqCancelBtn.closest("[data-admin-inquiry-confirm]");
+      if(inqCBox) inqCBox.hidden = true;
+      return;
+    }
+    var inqConfirmBtn = e.target.closest("[data-admin-inquiry-delete-confirm]");
+    if(inqConfirmBtn){
+      var inqCid = inqConfirmBtn.getAttribute("data-admin-inquiry-delete-confirm");
+      inqConfirmBtn.disabled = true;
+      sbDeleteInquiry(inqCid).then(function(result){
+        if(!result || !result.ok){
+          inqConfirmBtn.disabled = false;
+          toast("削除に失敗しました。時間をおいてもう一度お試しください。");
+          return;
+        }
+        renderAdminInquiries();
+        toast("お問い合わせを削除しました");
+      });
+      return;
+    }
   }
   if($("adminView")) $("adminView").addEventListener("click", handleAdminClick);
+  /* ---------- お問い合わせフォームの送信 ----------
+     種別が「削除申請」のときだけ対象プロフィールのURL欄を
+     表示し必須にする。ハニーポット欄（人間には見えない）に
+     入力があった場合は送信せず、完了表示だけ出す。送信先は
+     Supabase の inquiries テーブル。接続できない環境では
+     エラーを表示し、サイトの他の動作には影響させない。 */
+  function contactShowError(msg){
+    var box = $("contactError");
+    if(!box) return;
+    if(msg){ box.textContent = msg; box.hidden = false; }
+    else box.hidden = true;
+  }
+  function contactSyncKind(){
+    var kindEl = $("contactKind");
+    var field = $("contactTargetField");
+    if(!kindEl || !field) return;
+    field.hidden = kindEl.value !== "deletion";
+  }
+  if($("contactKind")) $("contactKind").addEventListener("change", contactSyncKind);
+  if($("contactMessage")) $("contactMessage").addEventListener("input", function(){
+    var c = $("contactMsgCount");
+    if(c) c.textContent = String(this.value.length);
+  });
+  if($("contactForm")) $("contactForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    contactShowError("");
+    var kind = $("contactKind") ? $("contactKind").value : "contact";
+    var name = $("contactName") ? $("contactName").value.trim() : "";
+    var email = $("contactEmail") ? $("contactEmail").value.trim() : "";
+    var targetUrl = $("contactTargetUrl") ? $("contactTargetUrl").value.trim() : "";
+    var message = $("contactMessage") ? $("contactMessage").value.trim() : "";
+    var hp = $("contactHp") ? $("contactHp").value : "";
+    if(hp){
+      /* ハニーポットに引っかかった送信は保存せず、完了表示
+         だけ出して終わる（自動送信への対策）。 */
+      var formHp = $("contactForm");
+      if(formHp) formHp.hidden = true;
+      var doneHp = $("contactDone");
+      if(doneHp) doneHp.hidden = false;
+      return;
+    }
+    if(!email){
+      contactShowError("メールアドレスを入力してください。");
+      if($("contactEmail")) $("contactEmail").focus();
+      return;
+    }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      contactShowError("メールアドレスの形式が正しくありません。");
+      if($("contactEmail")) $("contactEmail").focus();
+      return;
+    }
+    if(kind === "deletion" && !targetUrl){
+      contactShowError("削除申請の場合は、対象プロフィールのURLを入力してください。");
+      if($("contactTargetUrl")) $("contactTargetUrl").focus();
+      return;
+    }
+    if(!message){
+      contactShowError("内容を入力してください。");
+      if($("contactMessage")) $("contactMessage").focus();
+      return;
+    }
+    if(message.length > 2000){
+      contactShowError("内容は2000字以内で入力してください。");
+      if($("contactMessage")) $("contactMessage").focus();
+      return;
+    }
+    var submitBtn = $("contactSubmit");
+    if(submitBtn) submitBtn.disabled = true;
+    sbSubmitInquiry({
+      kind: kind,
+      name: name,
+      email: email,
+      targetUrl: kind === "deletion" ? targetUrl : "",
+      message: message
+    }).then(function(result){
+      if(submitBtn) submitBtn.disabled = false;
+      if(!result || !result.ok){
+        contactShowError("送信できませんでした。時間をおいてもう一度お試しください。");
+        return;
+      }
+      var form = $("contactForm");
+      if(form) form.hidden = true;
+      var done = $("contactDone");
+      if(done) done.hidden = false;
+    });
+  });
+  contactSyncKind();
   /* STEP 1: design choice — the share page's (布教シート) design
      only. The profile editor's STEP 1 design (state.design) is
      chosen independently and is NOT changed here. */
