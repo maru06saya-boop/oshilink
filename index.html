@@ -2198,6 +2198,7 @@
       <ul>
         <li>曲を検索するとき、入力した検索キーワードが、曲情報を取得するためにApple（iTunes Search API）へ送信されます。</li>
         <li>SNS・動画サイト・Apple Music・Amazon・楽天など外部サービスへのリンクを開くと、リンク先のサービスへアクセスします。リンク先での情報の取り扱いは、各サービスの規約・ポリシーが適用されます。</li>
+        <li>Googleログインを選んだ場合、認証のためにGoogleから名前・メールアドレスなどの情報を、Supabaseを経由して取得します。取得した情報はログイン（本人確認）の目的でのみ利用し、販売したり、広告に利用したりすることはありません。</li>
         <li>上記以外の目的で、入力した内容や保存データを外部へ送信することはありません。</li>
       </ul>
     </div>
@@ -5043,7 +5044,7 @@
     return {
       id: String(u.id || ""),
       userId: String(md.user_id || md.username || ""),
-      displayName: String(md.display_name || md.name || "") || (email ? email.split("@")[0] : "ユーザー"),
+      displayName: String(md.display_name || md.full_name || md.name || "") || (email ? email.split("@")[0] : "ユーザー"),
       email: email,
       _sb: true
     };
@@ -5474,7 +5475,26 @@
   if($("authToRegister")) $("authToRegister").addEventListener("click", function(){ setAuthMode("register"); });
   if($("authToLogin")) $("authToLogin").addEventListener("click", function(){ setAuthMode("login"); });
   if($("authMethodEmail")) $("authMethodEmail").addEventListener("click", function(){ setAuthStep("form"); });
-  if($("authMethodGoogle")) $("authMethodGoogle").addEventListener("click", function(){ showProviderPending(authMode === "register" ? "Googleでの登録" : "Googleログイン"); });
+  if($("authMethodGoogle")) $("authMethodGoogle").addEventListener("click", function(){
+    if(!Sb.available()){
+      showProviderPending(authMode === "register" ? "Googleでの登録" : "Googleログイン");
+      return;
+    }
+    try {
+      var oauthResult = Sb.client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: 'https://oshilink-official.github.io/oshilink/' } });
+      if(oauthResult && typeof oauthResult.then === "function"){
+        oauthResult.then(function(res){
+          if(res && res.error){
+            if(typeof toast === "function") toast("Googleログインを開始できませんでした。時間をおいてもう一度お試しください。", 5000);
+          }
+        }).catch(function(){
+          if(typeof toast === "function") toast("Googleログインを開始できませんでした。時間をおいてもう一度お試しください。", 5000);
+        });
+      }
+    } catch(e){
+      if(typeof toast === "function") toast("Googleログインを開始できませんでした。時間をおいてもう一度お試しください。", 5000);
+    }
+  });
   if($("authMethodX")) $("authMethodX").addEventListener("click", function(){ showProviderPending(authMode === "register" ? "Xでの登録" : "Xログイン"); });
   if($("authProviderToEmail")) $("authProviderToEmail").addEventListener("click", function(){ setAuthStep("form"); });
   if($("authBackToMethods")) $("authBackToMethods").addEventListener("click", function(){ setAuthStep("method"); });
