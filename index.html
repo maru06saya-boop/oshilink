@@ -146,12 +146,20 @@
   /* mypage: account card */
   .account-card{padding:18px}
   .account-head{display:flex; gap:13px; align-items:center}
-  .account-ava{flex:none; width:52px; height:52px; border-radius:50%; background:var(--grad); color:#330a20; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:900}
+  .account-ava{flex:none; width:52px; height:52px; border-radius:50%; background:var(--grad); color:#330a20; display:flex; align-items:center; justify-content:center; font-size:21px; font-weight:900; overflow:hidden}
+  .account-ava img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50%}
   .account-main{flex:1; min-width:0}
   .account-name{font-size:17px; font-weight:900; line-height:1.4; overflow-wrap:anywhere}
   .account-meta{font-size:12.5px; color:var(--dim); line-height:1.6; overflow-wrap:anywhere}
   .account-url{margin-top:12px; border:1px solid var(--border-soft); background:var(--surface-3); border-radius:11px; padding:9px 11px; font-size:12px; color:var(--dim); overflow-wrap:anywhere; line-height:1.55}
   .account-url b{display:block; font-size:11px; color:var(--pink); letter-spacing:.06em; margin-bottom:2px}
+  /* mypage: account profile edit (表示名 / アイコン) */
+  .account-edit{margin-top:14px; border-top:1px solid var(--border-soft); padding-top:14px}
+  .account-edit .field input[type="text"]{width:100%; max-width:100%; min-width:0; border:1px solid var(--border-soft); border-radius:11px; background:var(--surface-3); color:var(--text); font-family:inherit; font-size:16px; padding:11px 12px; color-scheme:light}
+  .acct-ava-thumb{flex:none; width:72px; height:72px; border-radius:50%; border:1.5px dashed var(--border); background:var(--grad); color:#330a20; display:flex; align-items:center; justify-content:center; overflow:hidden; font-size:26px; font-weight:900}
+  .acct-ava-thumb img{width:100%; height:100%; object-fit:cover; display:block; border-radius:50%}
+  .acct-ava-thumb.is-empty{border-color:transparent}
+  .account-edit-error{margin:0 0 12px}
   /* legal / info pages (広告について / 利用規約 / プライバシーポリシー / お問い合わせ) */
   .legal-card{padding:22px 20px 24px; text-align:left}
   .legal-lead{margin:0; font-size:13.5px; color:var(--dim); line-height:1.85}
@@ -1693,7 +1701,35 @@
     <p class="account-url"><b>あなたのページのURL</b><span id="mpAccountUrl">推しLink/@ ―――</span></p>
     <div class="mypage-item-actions">
       <button type="button" class="mypage-btn mypage-btn-primary" id="btnLoginMypage" hidden>ログイン / 新規登録</button>
+      <button type="button" class="mypage-btn" id="btnEditProfile" hidden>プロフィールを編集</button>
       <button type="button" class="mypage-btn" id="btnLogoutMypage">ログアウト</button>
+    </div>
+    <div class="account-edit" id="accountEditPanel" hidden>
+      <p class="auth-error account-edit-error" id="acctEditError" hidden></p>
+      <div class="field">
+        <label for="acctNameInput">表示名</label>
+        <input type="text" id="acctNameInput" autocomplete="off" />
+      </div>
+      <div class="field">
+        <span class="flabel">アイコン画像</span>
+        <div class="img-pick">
+          <div class="acct-ava-thumb" id="acctAvaThumb" aria-hidden="true">?</div>
+          <div>
+            <label class="btn-file" for="acctAvatarFile">画像を選ぶ</label>
+            <input type="file" id="acctAvatarFile" accept="image/*" hidden />
+            <div><button type="button" class="btn-ghost-sm" id="btnAcctAvaClear" hidden>画像を削除</button></div>
+            <p class="hint">選んだ画像は正方形に切り取って保存されます。</p>
+            <p class="img-note">許可をとっている画像を使用してください</p>
+            <label class="rights-check" id="rightsAcctWrap"><input type="checkbox" id="rights-acct" /><span>この画像を使う権利・許可を確認しました<small>自分が権利を持っている、または権利者から公開の許可を得た画像です。画像を選んだ場合は、チェックしないと保存できません。</small></span></label>
+            <p class="rights-error" id="rightsAcctError" hidden>アイコン画像の権利・許可の確認にチェックを入れてください。</p>
+          </div>
+        </div>
+      </div>
+      <div class="mypage-item-actions">
+        <button type="button" class="mypage-btn mypage-btn-primary" id="btnSaveAccountProfile">保存する</button>
+        <button type="button" class="mypage-btn" id="btnCancelAccountEdit">キャンセル</button>
+      </div>
+      <p class="save-feedback" id="acctSaveFeedback" role="status" aria-live="polite" hidden>✓ 保存しました</p>
     </div>
   </section>
   <section class="fcard mypage-sec" aria-label="推しプロフィールの管理">
@@ -5020,9 +5056,26 @@
       saveSession(user, !!remember);
       return { ok:true, user:user };
     }
+    function updateProfile(displayName, avatar){
+      var user = currentUser();
+      if(!user) return { ok:false, error:"ログインしていません。" };
+      var name = String(displayName || "").trim();
+      if(!name) return { ok:false, error:"表示名を入力してください。" };
+      var users = readUsers();
+      for(var i = 0; i < users.length; i++){
+        if(users[i].id === user.id){
+          users[i].displayName = name;
+          if(typeof avatar === "string") users[i].avatar = avatar;
+          writeUsers(users);
+          return { ok:true, user: users[i] };
+        }
+      }
+      return { ok:false, error:"アカウントが見つかりません。" };
+    }
     return {
       register: register,
       login: login,
+      updateProfile: updateProfile,
       logout: function(){ clearSession(); },
       currentUser: currentUser,
       isLoggedIn: function(){ return !!currentUser(); },
@@ -5045,6 +5098,7 @@
       id: String(u.id || ""),
       userId: String(md.user_id || md.username || ""),
       displayName: String(md.display_name || md.full_name || md.name || "") || (email ? email.split("@")[0] : "ユーザー"),
+      avatar: String(md.avatar || ""),
       email: email,
       _sb: true
     };
@@ -5110,6 +5164,48 @@
       return Promise.resolve({ ok:false, error:"通信に失敗しました。時間をおいてもう一度お試しください。" });
     }
   }
+  /* プロフィール編集（表示名・アイコン）の Supabase 保存:
+     user_metadata に display_name と avatar（data URL）を保存する。
+     既存の user_id など他のメタデータは消さないよう、現在の
+     メタデータを読み取ってマージしてから updateUser する。 */
+  function sbUpdateProfile(displayName, avatar){
+    var name = String(displayName || "").trim();
+    if(!name) return Promise.resolve({ ok:false, error:"表示名を入力してください。" });
+    if(!Sb.available() || !sbSessionUser) return Promise.resolve({ ok:false, error:"ログインしていません。" });
+    var buildData = function(existingMd){
+      var data = {};
+      if(existingMd && typeof existingMd === "object"){
+        Object.keys(existingMd).forEach(function(k){ data[k] = existingMd[k]; });
+      }
+      if(!data.user_id && sbSessionUser.userId) data.user_id = sbSessionUser.userId;
+      data.display_name = name;
+      data.avatar = typeof avatar === "string" ? avatar : "";
+      return data;
+    };
+    var doUpdate = function(existingMd){
+      try {
+        return Sb.client.auth.updateUser({ data: buildData(existingMd) }).then(function(res){
+          if(res && res.error) return { ok:false, error: sbAuthErrorText(res.error) };
+          var updated = (res && res.data && res.data.user) ? sbUserFromSupabase(res.data.user) : null;
+          if(updated) sbSessionUser = updated;
+          else if(sbSessionUser){ sbSessionUser.displayName = name; sbSessionUser.avatar = typeof avatar === "string" ? avatar : ""; }
+          return { ok:true, user: sbSessionUser };
+        }).catch(function(){
+          return { ok:false, error:"通信に失敗しました。時間をおいてもう一度お試しください。" };
+        });
+      } catch(e){
+        return Promise.resolve({ ok:false, error:"通信に失敗しました。時間をおいてもう一度お試しください。" });
+      }
+    };
+    try {
+      return Sb.client.auth.getUser().then(function(res){
+        var md = (res && res.data && res.data.user && res.data.user.user_metadata) ? res.data.user.user_metadata : null;
+        return doUpdate(md);
+      }).catch(function(){ return doUpdate(null); });
+    } catch(e){
+      return doUpdate(null);
+    }
+  }
   function sbHasStoredSession(){
     try {
       for(var i = 0; i < window.localStorage.length; i++){
@@ -5131,6 +5227,17 @@
         try { return sbLogin(identifier, password, remember); } catch(e){}
       }
       return Promise.resolve(LocalAuth.login(identifier, password, remember));
+    },
+    updateProfile: function(displayName, avatar){
+      var user = null;
+      try { user = Auth.currentUser(); } catch(e){}
+      if(!user) return Promise.resolve({ ok:false, error:"ログインしていません。" });
+      if(user._sb){
+        try { return sbUpdateProfile(displayName, avatar); } catch(e){}
+        return Promise.resolve({ ok:false, error:"通信に失敗しました。時間をおいてもう一度お試しください。" });
+      }
+      try { return Promise.resolve(LocalAuth.updateProfile(displayName, avatar)); }
+      catch(e){ return Promise.resolve({ ok:false, error:"保存に失敗しました。時間をおいてもう一度お試しください。" }); }
     },
     logout: function(){
       if(Sb.available()){
@@ -5409,7 +5516,12 @@
         : "<b>" + esc(user.displayName) + "</b> でログイン中";
     }
     if(loggedIn){
-      if($("mpAccountAva")) $("mpAccountAva").textContent = (user.displayName || "?").slice(0, 1);
+      var avaEl = $("mpAccountAva");
+      if(avaEl){
+        var avaSrc = (typeof safeImgSrc === "function") ? safeImgSrc(user.avatar) : "";
+        if(avaSrc) avaEl.innerHTML = '<img src="' + esc(avaSrc) + '" alt="" />';
+        else avaEl.textContent = (user.displayName || "?").slice(0, 1);
+      }
       if($("mpAccountName")) $("mpAccountName").textContent = user.displayName;
       if($("mpAccountMeta")) $("mpAccountMeta").textContent = user.userId ? ("@" + user.userId + " ／ " + user.email) : user.email;
       if($("mpAccountUrl")) $("mpAccountUrl").textContent = user.userId ? ("推しLink/@" + user.userId) : "推しLink/@ ―――";
@@ -5418,9 +5530,11 @@
       if($("mpAccountName")) $("mpAccountName").textContent = "ゲスト（未ログイン）";
       if($("mpAccountMeta")) $("mpAccountMeta").textContent = "ログインすると、プロフィールの管理ができます。";
       if($("mpAccountUrl")) $("mpAccountUrl").textContent = "推しLink/@ ―――（ログインすると決まります）";
+      if($("accountEditPanel")) $("accountEditPanel").hidden = true;
     }
     if($("btnLogoutMypage")) $("btnLogoutMypage").hidden = !loggedIn;
     if($("btnLoginMypage")) $("btnLoginMypage").hidden = loggedIn;
+    if($("btnEditProfile")) $("btnEditProfile").hidden = !loggedIn;
   }
   function showAuthView(mode){
     closeMenuPanel();
@@ -5578,6 +5692,179 @@
   if($("menuLogout")) $("menuLogout").addEventListener("click", authLogout);
   if($("btnLogoutMypage")) $("btnLogoutMypage").addEventListener("click", authLogout);
   if($("btnLoginMypage")) $("btnLoginMypage").addEventListener("click", function(){ pendingAuthAction = null; pendingAuthLabel = ""; showAuthView("login"); });
+
+  /* ---------- マイページ: プロフィール編集（表示名・アイコン） ----------
+     アカウントカードの「プロフィールを編集」から開く編集パネル。
+     アイコンは端末から画像を選び、中央を正方形に切り取って
+     256×256 の JPEG にリサイズしてから保存する。保存先は
+     Auth.updateProfile が振り分ける（Supabase ログイン中は
+     user_metadata の display_name / avatar、端末内アカウントは
+     ユーザーレコード）。ユーザーIDとページのURLは変更しない。
+     新しい画像を選んだ場合は、他の画像アップロード箇所と
+     同じ権利・許可の同意チェックがないと保存できない。 */
+  var acctAvatarPending = { mode: "keep", dataUrl: "" };
+  var acctSaving = false;
+  function acctShowError(msg){
+    var box = $("acctEditError");
+    if(!box) return;
+    if(msg){ box.textContent = msg; box.hidden = false; }
+    else { box.textContent = ""; box.hidden = true; }
+  }
+  function acctEffectiveAvatar(){
+    if(acctAvatarPending.mode === "new") return acctAvatarPending.dataUrl;
+    if(acctAvatarPending.mode === "clear") return "";
+    var user = null;
+    try { user = Auth.currentUser(); } catch(e){}
+    return (user && user.avatar) ? safeImgSrc(user.avatar) : "";
+  }
+  function renderAcctAvaThumb(){
+    var thumb = $("acctAvaThumb");
+    if(!thumb) return;
+    var src = acctEffectiveAvatar();
+    if(src){
+      thumb.classList.remove("is-empty");
+      thumb.innerHTML = '<img src="' + esc(src) + '" alt="" />';
+    } else {
+      thumb.classList.add("is-empty");
+      var nameInput = $("acctNameInput");
+      var initial = "?";
+      var user = null;
+      try { user = Auth.currentUser(); } catch(e){}
+      var base = (nameInput && nameInput.value.trim()) || (user ? user.displayName : "") || "";
+      if(base) initial = base.slice(0, 1);
+      thumb.textContent = initial;
+    }
+    var clearBtn = $("btnAcctAvaClear");
+    if(clearBtn) clearBtn.hidden = !src;
+  }
+  function syncAcctRightsUI(){
+    var cb = $("rights-acct");
+    var missing = !!(acctAvatarPending.mode === "new" && acctAvatarPending.dataUrl && cb && !cb.checked);
+    var wrap = $("rightsAcctWrap"); if(wrap) wrap.classList.toggle("is-missing", missing);
+    var err = $("rightsAcctError"); if(err) err.hidden = !missing;
+    return missing;
+  }
+  function openAccountEdit(){
+    var user = null;
+    try { user = Auth.currentUser(); } catch(e){}
+    if(!user) return;
+    acctAvatarPending = { mode: "keep", dataUrl: "" };
+    acctShowError("");
+    if($("acctNameInput")) $("acctNameInput").value = user.displayName || "";
+    if($("acctAvatarFile")) $("acctAvatarFile").value = "";
+    var cb = $("rights-acct"); if(cb) cb.checked = false;
+    var fb = $("acctSaveFeedback"); if(fb) fb.hidden = true;
+    renderAcctAvaThumb();
+    syncAcctRightsUI();
+    if($("accountEditPanel")) $("accountEditPanel").hidden = false;
+  }
+  function closeAccountEdit(){
+    if($("accountEditPanel")) $("accountEditPanel").hidden = true;
+    acctAvatarPending = { mode: "keep", dataUrl: "" };
+    acctShowError("");
+  }
+  function acctResizeImage(file, cb){
+    if(!file) return;
+    var url = null;
+    try { url = window.URL.createObjectURL(file); } catch(e){}
+    if(!url){
+      var r = new FileReader();
+      r.onload = function(){ acctResizeFromSrc(String(r.result), cb); };
+      r.onerror = function(){ cb(""); };
+      r.readAsDataURL(file);
+      return;
+    }
+    acctResizeFromSrc(url, function(dataUrl){
+      try { window.URL.revokeObjectURL(url); } catch(e){}
+      cb(dataUrl);
+    });
+  }
+  function acctResizeFromSrc(src, cb){
+    var img = new Image();
+    img.onload = function(){
+      try {
+        var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        if(!w || !h){ cb(""); return; }
+        var side = Math.min(w, h);
+        var sx = (w - side) / 2, sy = (h - side) / 2;
+        var canvas = document.createElement("canvas");
+        canvas.width = 256; canvas.height = 256;
+        var ctx = canvas.getContext("2d");
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, 256, 256);
+        cb(canvas.toDataURL("image/jpeg", 0.85));
+      } catch(e){ cb(""); }
+    };
+    img.onerror = function(){ cb(""); };
+    img.src = src;
+  }
+  if($("btnEditProfile")) $("btnEditProfile").addEventListener("click", function(){
+    var panel = $("accountEditPanel");
+    if(panel && !panel.hidden) closeAccountEdit();
+    else openAccountEdit();
+  });
+  if($("btnCancelAccountEdit")) $("btnCancelAccountEdit").addEventListener("click", closeAccountEdit);
+  if($("acctAvatarFile")) $("acctAvatarFile").addEventListener("change", function(){
+    var f = this.files && this.files[0];
+    if(!f) return;
+    acctResizeImage(f, function(dataUrl){
+      if(!dataUrl){ toast("画像を読み込めませんでした。別の画像でお試しください。"); return; }
+      acctAvatarPending = { mode: "new", dataUrl: dataUrl };
+      var cb = $("rights-acct"); if(cb) cb.checked = false;
+      acctShowError("");
+      renderAcctAvaThumb();
+      syncAcctRightsUI();
+    });
+  });
+  if($("btnAcctAvaClear")) $("btnAcctAvaClear").addEventListener("click", function(){
+    acctAvatarPending = { mode: "clear", dataUrl: "" };
+    if($("acctAvatarFile")) $("acctAvatarFile").value = "";
+    renderAcctAvaThumb();
+    syncAcctRightsUI();
+  });
+  if($("rights-acct")) $("rights-acct").addEventListener("change", syncAcctRightsUI);
+  if($("acctNameInput")) $("acctNameInput").addEventListener("input", function(){
+    if(acctAvatarPending.mode !== "new") renderAcctAvaThumb();
+  });
+  if($("btnSaveAccountProfile")) $("btnSaveAccountProfile").addEventListener("click", function(){
+    if(acctSaving) return;
+    var user = null;
+    try { user = Auth.currentUser(); } catch(e){}
+    if(!user) return;
+    var name = $("acctNameInput") ? $("acctNameInput").value.trim() : "";
+    if(!name){
+      acctShowError("表示名を入力してください。");
+      if($("acctNameInput")) $("acctNameInput").focus();
+      return;
+    }
+    if(syncAcctRightsUI()){
+      toast("アイコン画像の権利・許可を確認してから保存してください");
+      var wrap = $("rightsAcctWrap");
+      if(wrap && wrap.scrollIntoView) wrap.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    var avatarToSave = acctAvatarPending.mode === "new" ? acctAvatarPending.dataUrl
+      : acctAvatarPending.mode === "clear" ? ""
+      : (user.avatar || "");
+    acctShowError("");
+    acctSaving = true;
+    var saveBtn = $("btnSaveAccountProfile");
+    if(saveBtn) saveBtn.disabled = true;
+    Promise.resolve(Auth.updateProfile(name, avatarToSave)).then(function(result){
+      acctSaving = false;
+      if(saveBtn) saveBtn.disabled = false;
+      if(!result || !result.ok){
+        acctShowError(result && result.error ? result.error : "保存に失敗しました。時間をおいてもう一度お試しください。");
+        return;
+      }
+      closeAccountEdit();
+      syncAuthUI();
+      toast("保存しました");
+    }).catch(function(){
+      acctSaving = false;
+      if(saveBtn) saveBtn.disabled = false;
+      acctShowError("保存に失敗しました。時間をおいてもう一度お試しください。");
+    });
+  });
 
   var DEFAULT_PAGE_TITLE = document.title;
   function hideSubViews(){
