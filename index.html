@@ -720,6 +720,12 @@
   .aff-lead{margin:0 0 14px; font-size:13px; color:var(--dim); line-height:1.75}
   .aff-note{margin:12px 0 0; font-size:11.5px; color:var(--faint); line-height:1.7}
   .aff-feedback{margin:10px 0 0; text-align:center; font-size:13.5px; font-weight:900; color:var(--pink)}
+  /* admin page (運営者ページ): 「サイトを見る」は .btn-save を
+     アンカーで使う。お知らせ管理の一覧は .news-item を再利用し、
+     削除ボタンと確認ボックスはマイページと同じ部品で揃える */
+  a.btn-save{text-decoration:none}
+  .admin-sec-note{margin:12px 0 0; font-size:11.5px; color:var(--faint); line-height:1.7}
+  .admin-notice-list{margin-top:18px; border-top:1px solid var(--border-soft)}
   .pv-video{display:block; text-decoration:none; border:1px solid var(--border-soft); border-radius:13px; overflow:hidden; margin-bottom:10px; background:var(--surface-3)}
   .pv-video .thumb{position:relative; aspect-ratio:16/9; background:#170510; display:flex; align-items:center; justify-content:center}
   .pv-video .thumb img{position:absolute; inset:0; width:100%; height:100%; object-fit:cover}
@@ -972,6 +978,7 @@
       <button type="button" class="menu-item" id="menuFavorites">お気に入り<span class="arr" aria-hidden="true">›</span></button>
       <button type="button" class="menu-item" id="menuMyPage">マイページ<span class="arr" aria-hidden="true">›</span></button>
       <button type="button" class="menu-item" id="menuLogout" hidden>ログアウト<span class="arr" aria-hidden="true">›</span></button>
+      <button type="button" class="menu-item" id="menuAdmin" hidden>運営者ページ<span class="arr" aria-hidden="true">›</span></button>
       <div class="menu-sep" aria-hidden="true"></div>
       <button type="button" class="menu-item" id="menuNews">お知らせ<span class="arr" aria-hidden="true">›</span></button>
       <button type="button" class="menu-item" id="menuFaq">よくある質問（FAQ）<span class="arr" aria-hidden="true">›</span></button>
@@ -1767,31 +1774,6 @@
       <span class="mypage-toggle-side"><span class="mypage-count" id="mypageFavsCount" hidden></span><span class="mypage-chevron" aria-hidden="true">›</span></span>
     </button>
   </section>
-  <section class="fcard mypage-sec" aria-label="アフィリエイト設定">
-    <button type="button" class="mypage-toggle" data-mp-toggle="affiliate" aria-expanded="false" aria-controls="mypageAffiliateBody">
-      <span class="mypage-toggle-main">
-        <span class="mypage-toggle-title">アフィリエイト設定</span>
-        <span class="mypage-toggle-desc">好きな曲の購入リンクに使う、あなたのアフィリエイトIDを設定します。</span>
-      </span>
-      <span class="mypage-toggle-side"><span class="mypage-count" id="mypageAffiliateStatus" hidden>設定済み</span><span class="mypage-chevron" aria-hidden="true">›</span></span>
-    </button>
-    <div class="mypage-body" id="mypageAffiliateBody" hidden>
-      <p class="aff-lead">IDを設定すると、プロフィールのプレビュー「好きな曲」に、その曲名とアーティスト名で探す「Amazonで探す」「楽天で探す」の購入リンクが表示されます。リンクの近くにはPR表記（アフィリエイト広告である旨）も一緒に表示されます。IDが未設定の間は、購入リンクもPR表記も表示されません。トップページや各プロフィールの下にあるアルバム棚、広告枠のアフィリエイトバナーの購入リンクにも、同じIDが使われます。</p>
-      <div class="field">
-        <label for="affAmazonTag">Amazonアソシエイトのタグ</label>
-        <input type="text" id="affAmazonTag" placeholder="例：yourtag-22" autocomplete="off" spellcheck="false" />
-        <p class="hint">Amazonアソシエイトで発行されたトラッキングID（タグ）を貼ってください。</p>
-      </div>
-      <div class="field">
-        <label for="affRakutenId">楽天アフィリエイトID</label>
-        <input type="text" id="affRakutenId" placeholder="楽天アフィリエイトIDを貼り付け" autocomplete="off" spellcheck="false" />
-        <p class="hint">楽天アフィリエイトで発行されたアフィリエイトIDを貼ってください。</p>
-      </div>
-      <button type="button" class="btn-save" data-mp-save-affiliate style="margin-top:4px">保存する</button>
-      <p class="aff-feedback" id="affSaveFeedback" role="status" aria-live="polite" hidden>✓ 保存しました</p>
-      <p class="aff-note">片方だけの設定でも大丈夫です。設定したサービスのリンクだけが表示されます。リンクを表示したくないときは、空欄にして保存してください。IDはこの端末のブラウザにだけ保存され、プロフィールのデータには含まれません。</p>
-    </div>
-  </section>
 </div>
 
 <div class="sub-wrap" id="mypageProfilesView" hidden>
@@ -2348,6 +2330,53 @@
   </section>
 </div>
 
+<div class="sub-wrap" id="adminView" hidden>
+  <div class="ed-top">
+    <button type="button" class="btn-back" data-back-home>← もどる</button>
+    <h1>運営者ページ</h1>
+  </div>
+
+  <section class="fcard" aria-label="サイトを見る">
+    <a class="btn-save" href="https://oshilink-official.github.io/oshilink/" target="_blank" rel="noopener noreferrer">サイトを見る</a>
+    <p class="admin-sec-note">公開中のサイトを新しいタブで開きます。ここで変更した内容が、みんなが見ているページに反映されているか確認できます。</p>
+  </section>
+
+  <section class="fcard" aria-label="アフィリエイト設定">
+    <h2>アフィリエイト設定</h2>
+    <p class="aff-lead">IDを設定すると、プロフィールのプレビュー「好きな曲」に、その曲名とアーティスト名で探す「Amazonで探す」「楽天で探す」の購入リンクが表示されます。リンクの近くにはPR表記（アフィリエイト広告である旨）も一緒に表示されます。IDが未設定の間は、購入リンクもPR表記も表示されません。トップページや各プロフィールの下にあるアルバム棚、広告枠のアフィリエイトバナーの購入リンクにも、同じIDが使われます。</p>
+    <p class="auth-error" id="adminAffError" hidden></p>
+    <div class="field">
+      <label for="adminAffAmazonTag">Amazonアソシエイトのタグ</label>
+      <input type="text" id="adminAffAmazonTag" placeholder="例：yourtag-22" autocomplete="off" spellcheck="false" />
+      <p class="hint">Amazonアソシエイトで発行されたトラッキングID（タグ）を貼ってください。</p>
+    </div>
+    <div class="field">
+      <label for="adminAffRakutenId">楽天アフィリエイトID</label>
+      <input type="text" id="adminAffRakutenId" placeholder="楽天アフィリエイトIDを貼り付け" autocomplete="off" spellcheck="false" />
+      <p class="hint">楽天アフィリエイトで発行されたアフィリエイトIDを貼ってください。</p>
+    </div>
+    <button type="button" class="btn-save" data-admin-save-affiliate style="margin-top:4px">保存する</button>
+    <p class="aff-feedback" id="adminAffSaveFeedback" role="status" aria-live="polite" hidden>✓ 保存しました</p>
+    <p class="aff-note">片方だけの設定でも大丈夫です。設定したサービスのリンクだけが表示されます。リンクを表示したくないときは、空欄にして保存してください。設定はサーバーに保存され、サイト全体に反映されます。</p>
+  </section>
+
+  <section class="fcard" aria-label="お知らせ管理">
+    <h2>お知らせ管理</h2>
+    <p class="auth-error" id="adminNoticeError" hidden></p>
+    <div class="field">
+      <label for="adminNoticeTitle">タイトル</label>
+      <input type="text" id="adminNoticeTitle" placeholder="お知らせのタイトル" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="adminNoticeBody">本文</label>
+      <textarea id="adminNoticeBody" placeholder="お知らせの本文"></textarea>
+    </div>
+    <button type="button" class="btn-save" data-admin-post-notice style="margin-top:4px">投稿する</button>
+    <p class="aff-feedback" id="adminNoticeFeedback" role="status" aria-live="polite" hidden>✓ 投稿しました</p>
+    <div class="admin-notice-list" id="adminNoticeList"></div>
+  </section>
+</div>
+
 <footer class="site-foot">
   <nav class="foot-nav" aria-label="サイト情報">
     <button type="button" class="foot-link" data-legal-nav="adsView">広告について</button>
@@ -2465,7 +2494,8 @@
     adsView: "ads",
     privacyView: "privacy",
     contactView: "contact",
-    tokushoView: "tokusho"
+    tokushoView: "tokusho",
+    adminView: "admin"
   };
 
   /* ---------- zodiac ---------- */
@@ -3352,15 +3382,21 @@
 
   /* ---------- affiliate settings（好きな曲の購入リンク） ----------
      運営者（このページの持ち主）自身のアフィリエイトIDの受け皿。
-     マイページの「アフィリエイト設定」で入力・保存し、この端末の
-     localStorage（"oshilink.affiliate.v1"）に保持する。
+     運営者ページで入力・保存し、Supabase の site_settings
+     （key='affiliate'、value は { amazon, rakuten }）に保持する。
+     読み込みはサーバー設定（sbFetchSiteAffiliate で取得して
+     serverAffiliateSettings に保持した値）を最優先し、取得でき
+     ない場合だけ従来の端末内設定（localStorage
+     "oshilink.affiliate.v1"）とコード側の初期値にフォールバック
+     する。サイト全体のアフィリエイト表示（好きな曲の購入リンク・
+     アルバム棚・広告枠のバナー）はすべて readAffiliateSettings()
+     経由でこの値を読む。
      プロフィールの保存データには含めない。
      例外として、運営者の楽天アフィリエイトIDだけはコード側に
      初期値（DEFAULT_RAKUTEN_ID）として組み込んである。端末に
      設定が保存されていない訪問者にも、その ID の楽天リンクが
      表示されるようにするためで、端末に設定が保存されている
      場合はそちらが優先される。Amazon のタグに初期値は無い。
-     通常の JavaScript + localStorage のみで実装している。
 
      表示ルール:
        - ID が1つでも設定されていれば、「好きな曲」のプレビューに
@@ -3382,13 +3418,61 @@
      （空欄で保存されていれば、その保存内容がそのまま有効になる）。
      Amazon のタグは初期値を置かず、未設定のまま。 */
   var DEFAULT_RAKUTEN_ID = "59c72c35.b54fae88.59c72c36.1c3c72be";
+  /* サーバー（site_settings）のアフィリエイト設定。取得できる
+     までは null のままで、その間 readAffiliateSettings() は
+     従来の端末内設定＋初期値にフォールバックする。 */
+  var serverAffiliateSettings = null;
   function readAffiliateSettings(){
+    if(serverAffiliateSettings){
+      return { amazonTag: serverAffiliateSettings.amazonTag, rakutenId: serverAffiliateSettings.rakutenId };
+    }
     var data = readStoredJson(AFFILIATE_STORAGE_KEY);
     if(!data || typeof data !== "object") return { amazonTag:"", rakutenId:DEFAULT_RAKUTEN_ID };
     return {
       amazonTag: String(data.amazonTag || "").trim(),
       rakutenId: String(data.rakutenId || "").trim()
     };
+  }
+  /* site_settings（key='affiliate'）を読み、取得できたら
+     serverAffiliateSettings に保持して表示中のアフィリエイト
+     表示（アルバム棚・広告枠バナー）を新しい値で描き直す。
+     取得できない場合は何もしない（フォールバックのまま）。 */
+  function sbFetchSiteAffiliate(){
+    if(typeof Sb === "undefined" || !Sb.available()) return;
+    try {
+      Sb.client.from("site_settings").select("value").eq("key", "affiliate").limit(1).then(function(res){
+        if(!res || res.error || !Array.isArray(res.data) || !res.data.length) return;
+        var v = res.data[0] ? res.data[0].value : null;
+        if(!v || typeof v !== "object") return;
+        serverAffiliateSettings = {
+          amazonTag: String(v.amazon != null ? v.amazon : (v.amazonTag || "")).trim(),
+          rakutenId: String(v.rakuten != null ? v.rakuten : (v.rakutenId || "")).trim()
+        };
+        if(typeof renderAlbumShelf === "function") renderAlbumShelf();
+        if(typeof renderAdSlots === "function") renderAdSlots();
+      }).catch(function(){});
+    } catch(e){}
+  }
+  /* 運営者ページからの保存: site_settings へ upsert する。
+     成功したらサーバー設定として保持し直し、端末内設定にも
+     同じ値を残す（サーバー取得できない環境でのフォールバック）。 */
+  function sbSaveSiteAffiliate(settings){
+    var data = {
+      amazonTag: String((settings && settings.amazonTag) || "").trim(),
+      rakutenId: String((settings && settings.rakutenId) || "").trim()
+    };
+    if(typeof Sb === "undefined" || !Sb.available()) return Promise.resolve({ ok:false });
+    try {
+      return Sb.client.from("site_settings").upsert(
+        { key:"affiliate", value:{ amazon:data.amazonTag, rakuten:data.rakutenId }, updated_at:new Date().toISOString() },
+        { onConflict:"key" }
+      ).then(function(res){
+        if(res && res.error) return { ok:false };
+        serverAffiliateSettings = data;
+        writeAffiliateSettings(data);
+        return { ok:true };
+      }).catch(function(){ return { ok:false }; });
+    } catch(e){ return Promise.resolve({ ok:false }); }
   }
   function writeAffiliateSettings(settings){
     var data = {
@@ -5135,6 +5219,11 @@
      ログイン中ユーザー（{ id, userId, displayName, email }）。
      getSession / onAuthStateChange で常に最新に保つ。 */
   var sbSessionUser = null;
+  /* 運営者判定の結果。Supabase ログイン中のみ admins テーブルに
+     自分のユーザーIDの行があるかを select で確認し、結果を保持
+     する（sbCheckAdmin）。端末内モック認証では運営者扱いにしない。 */
+  var sbIsAdmin = false;
+  var sbAdminCheckedFor = "";
   function sbUserFromSupabase(u){
     if(!u || typeof u !== "object") return null;
     var md = (u.user_metadata && typeof u.user_metadata === "object") ? u.user_metadata : {};
@@ -5292,6 +5381,8 @@
         } catch(e){}
         sbSessionUser = null;
       }
+      sbIsAdmin = false;
+      sbAdminCheckedFor = "";
       try { LocalAuth.logout(); } catch(e){}
     },
     currentUser: function(){
@@ -5309,6 +5400,124 @@
       try { return LocalAuth.takeExpiredNotice(); } catch(e){ return false; }
     }
   };
+  /* ---------- 運営者判定（admins テーブル） ----------
+     Supabase ログイン中（sbSessionUser がある）ときだけ、
+     admins テーブルに自分のユーザーIDの行があるかを select
+     で確認し、結果を sbIsAdmin に保持する。同じユーザーでは
+     1回だけ確認する。端末内モック認証（LocalAuth）のユーザー
+     は sbSessionUser に入らないため、運営者扱いにはならない。 */
+  function sbCheckAdmin(){
+    var user = (Sb.available() && sbSessionUser) ? sbSessionUser : null;
+    if(!user || !user.id){
+      sbIsAdmin = false;
+      sbAdminCheckedFor = "";
+      if(typeof syncAuthUI === "function") syncAuthUI();
+      return Promise.resolve(false);
+    }
+    if(sbAdminCheckedFor === user.id) return Promise.resolve(sbIsAdmin);
+    sbAdminCheckedFor = user.id;
+    try {
+      return Sb.client.from("admins").select("user_id").eq("user_id", user.id).limit(1).then(function(res){
+        sbIsAdmin = !!(res && !res.error && Array.isArray(res.data) && res.data.length);
+        if(typeof syncAuthUI === "function") syncAuthUI();
+        return sbIsAdmin;
+      }).catch(function(){
+        sbIsAdmin = false;
+        if(typeof syncAuthUI === "function") syncAuthUI();
+        return false;
+      });
+    } catch(e){
+      sbIsAdmin = false;
+      return Promise.resolve(false);
+    }
+  }
+  /* ---------- お知らせ（notices テーブル） ----------
+     お知らせページと運営者ページの管理一覧は、どちらも
+     notices テーブルから新しい順に読む。取得できないときは
+     null を返し、呼び出し側が空状態にフォールバックする。 */
+  function sbFetchNotices(){
+    if(!Sb.available()) return Promise.resolve(null);
+    try {
+      return Sb.client.from("notices").select("id, title, body, created_at").order("created_at", { ascending:false }).then(function(res){
+        if(!res || res.error || !Array.isArray(res.data)) return null;
+        return res.data;
+      }).catch(function(){ return null; });
+    } catch(e){ return Promise.resolve(null); }
+  }
+  function noticeDateText(iso){
+    var d = new Date(iso || "");
+    if(isNaN(d.getTime())) return "";
+    return d.getFullYear() + "年" + (d.getMonth() + 1) + "月" + d.getDate() + "日";
+  }
+  function newsItemHtml(n){
+    var body = String((n && n.body) || "");
+    var bodyHtml = body ? "<p>" + esc(body).replace(/\n/g, "<br />") + "</p>" : "";
+    return '<article class="news-item"><p class="news-date">' + esc(noticeDateText(n && n.created_at)) + "</p><h3>" + esc(String((n && n.title) || "")) + "</h3>" + bodyHtml + "</article>";
+  }
+  /* お知らせページ: notices から新しい順に表示する。0件または
+     取得できないときは従来の空状態にする。 */
+  function renderNewsList(){
+    var list = $("newsList");
+    if(!list) return;
+    sbFetchNotices().then(function(rows){
+      if(!rows || !rows.length){
+        list.innerHTML = '<p class="news-empty">現在お知らせはありません。</p>';
+        return;
+      }
+      list.innerHTML = rows.map(newsItemHtml).join("");
+    });
+  }
+  /* 運営者ページ: アフィリエイト設定の現在値（サーバー優先の
+     読み込み経路）を入力欄へ反映し、お知らせ一覧を読み込む。 */
+  function renderAdminPage(){
+    var aff = readAffiliateSettings();
+    var aEl = $("adminAffAmazonTag"), rEl = $("adminAffRakutenId");
+    if(aEl && document.activeElement !== aEl) aEl.value = aff.amazonTag;
+    if(rEl && document.activeElement !== rEl) rEl.value = aff.rakutenId;
+    renderAdminNotices();
+  }
+  function renderAdminNotices(){
+    var box = $("adminNoticeList");
+    if(!box) return;
+    box.innerHTML = '<p class="news-empty">読み込み中…</p>';
+    sbFetchNotices().then(function(rows){
+      if(!rows){
+        box.innerHTML = '<p class="news-empty">お知らせを取得できませんでした。時間をおいてもう一度お試しください。</p>';
+        return;
+      }
+      if(!rows.length){
+        box.innerHTML = '<p class="news-empty">投稿されたお知らせはまだありません。</p>';
+        return;
+      }
+      var html = '<div class="news-list">';
+      rows.forEach(function(n){
+        var id = esc(String(n.id || ""));
+        html += '<article class="news-item"><p class="news-date">' + esc(noticeDateText(n.created_at)) + "</p><h3>" + esc(String(n.title || "")) + "</h3>"
+          + (String(n.body || "") ? "<p>" + esc(String(n.body)).replace(/\n/g, "<br />") + "</p>" : "")
+          + '<div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-danger" data-admin-notice-delete="' + id + '">削除する</button></div>'
+          + '<div class="mypage-confirm" data-admin-notice-confirm="' + id + '" hidden><p>このお知らせを削除しますか？</p><div class="mypage-item-actions"><button type="button" class="mypage-btn mypage-btn-danger" data-admin-notice-delete-confirm="' + id + '">削除する</button><button type="button" class="mypage-btn" data-admin-notice-delete-cancel>キャンセル</button></div></div>'
+          + "</article>";
+      });
+      html += "</div>";
+      box.innerHTML = html;
+    });
+  }
+  function sbPostNotice(title, body){
+    if(!Sb.available()) return Promise.resolve({ ok:false });
+    try {
+      return Sb.client.from("notices").insert({ title:title, body:body }).then(function(res){
+        return { ok: !(res && res.error) };
+      }).catch(function(){ return { ok:false }; });
+    } catch(e){ return Promise.resolve({ ok:false }); }
+  }
+  function sbDeleteNotice(id){
+    if(!Sb.available()) return Promise.resolve({ ok:false });
+    try {
+      return Sb.client.from("notices").delete().eq("id", String(id || "")).then(function(res){
+        return { ok: !(res && res.error) };
+      }).catch(function(){ return { ok:false }; });
+    } catch(e){ return Promise.resolve({ ok:false }); }
+  }
   /* ---------- profiles テーブル連携 ----------
      slug: そのプロフィールのユーザーID（アカウントのユーザー
      ID）。未設定のときはプロフィールIDから生成した文字列
@@ -5651,11 +5860,13 @@
         var session = (res && res.data) ? res.data.session : null;
         sbSessionUser = session ? sbUserFromSupabase(session.user) : null;
         if(typeof syncAuthUI === "function") syncAuthUI();
+        if(typeof sbCheckAdmin === "function") sbCheckAdmin();
         if(sbSessionUser) sbFetchAndMergeProfiles();
       }).catch(function(){});
       Sb.client.auth.onAuthStateChange(function(event, session){
         sbSessionUser = session ? sbUserFromSupabase(session.user) : null;
         if(typeof syncAuthUI === "function") syncAuthUI();
+        if(typeof sbCheckAdmin === "function") sbCheckAdmin();
         if(event === "SIGNED_IN" && sbSessionUser) sbFetchAndMergeProfiles();
         /* Googleログインは OAuth リダイレクトから戻ってきたときに
            ここで SIGNED_IN が発火する（メールログインはフォーム側で
@@ -5711,6 +5922,9 @@
     if($("menuLogin")) $("menuLogin").hidden = loggedIn;
     if($("menuRegister")) $("menuRegister").hidden = loggedIn;
     if($("menuLogout")) $("menuLogout").hidden = !loggedIn;
+    /* 運営者ページの入口は運営者のときだけ出す（非運営者・
+       未ログインには存在自体を見せない）。 */
+    if($("menuAdmin")) $("menuAdmin").hidden = !sbIsAdmin;
     var info = $("menuAccountInfo");
     if(info){
       info.hidden = !loggedIn;
@@ -6073,7 +6287,7 @@
 
   var DEFAULT_PAGE_TITLE = document.title;
   function hideSubViews(){
-    ["mypageView", "mypageProfilesView", "mypageSheetsView", "mypageFavsView", "searchView", "searchResultsView", "searchProfileView", "publicProfileView", "termsView", "newsView", "faqView", "premiumView", "adsView", "privacyView", "contactView", "tokushoView", "authView"].forEach(function(id){
+    ["mypageView", "mypageProfilesView", "mypageSheetsView", "mypageFavsView", "searchView", "searchResultsView", "searchProfileView", "publicProfileView", "termsView", "newsView", "faqView", "premiumView", "adsView", "privacyView", "contactView", "tokushoView", "authView", "adminView"].forEach(function(id){
       var el = $(id);
       if(el) el.hidden = true;
     });
@@ -6111,7 +6325,7 @@
   var selectedProfileId = null;
   var selectedSheetId = null;
   var selectedFavId = null;
-  var mypageOpenSections = { profiles:false, sheets:false, favs:false, affiliate:false };
+  var mypageOpenSections = { profiles:false, sheets:false, favs:false };
   function genProfileId(){
     return "p" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
@@ -6569,23 +6783,6 @@
     paintCount("mypageProfilesCount", profiles.length);
     paintCount("mypageSheetsCount", profiles.length + (hasLegacySheetOnly ? 1 : 0));
     paintCount("mypageFavsCount", favorites.length);
-    /* affiliate settings section: no person-count badge — the
-       badge instead shows 設定済み once either ID is saved.
-       Inputs are refilled from the saved settings, except while
-       the person is typing in one of them (renderMyPage also runs
-       on section toggles, and unsaved typing must not be lost). */
-    (function(){
-      var body = $("mypageAffiliateBody");
-      if(body) body.hidden = !mypageOpenSections.affiliate;
-      var toggle = document.querySelector('[data-mp-toggle="affiliate"]');
-      if(toggle) toggle.setAttribute("aria-expanded", String(!!mypageOpenSections.affiliate));
-      var aff = readAffiliateSettings();
-      var badge = $("mypageAffiliateStatus");
-      if(badge) badge.hidden = !(aff.amazonTag || aff.rakutenId);
-      var aEl = $("affAmazonTag"), rEl = $("affRakutenId");
-      if(aEl && document.activeElement !== aEl) aEl.value = aff.amazonTag;
-      if(rEl && document.activeElement !== rEl) rEl.value = aff.rakutenId;
-    })();
     var profileList = $("mypageProfileList");
     var profileDetail = $("mypageProfileDetail");
     if(profileList){
@@ -7698,6 +7895,8 @@
     $(id).hidden = false;
     if(id === "mypageView" || id === "mypageProfilesView" || id === "mypageSheetsView" || id === "mypageFavsView") renderMyPage();
     if(id === "searchView") initSearch();
+    if(id === "newsView") renderNewsList();
+    if(id === "adminView") renderAdminPage();
     window.scrollTo(0, 0);
     gaView(GA_VIEW_NAMES[id] || id);
   }
@@ -7717,6 +7916,7 @@
   $("btnMyPage").addEventListener("click", function(){ openSubView("mypageView"); });
   $("btnSearch").addEventListener("click", function(){ openSubView("searchView"); });
   $("btnMenu").addEventListener("click", function(e){ e.stopPropagation(); toggleMenuPanel(); });
+  if($("menuAdmin")) $("menuAdmin").addEventListener("click", function(){ openSubView("adminView"); });
   if($("menuNews")) $("menuNews").addEventListener("click", function(){ openSubView("newsView"); });
   if($("menuFaq")) $("menuFaq").addEventListener("click", function(){ openSubView("faqView"); });
   if($("menuPremium")) $("menuPremium").addEventListener("click", function(){ openSubView("premiumView"); });
@@ -7752,27 +7952,6 @@
       var key = toggle.getAttribute("data-mp-toggle");
       mypageOpenSections[key] = !mypageOpenSections[key];
       renderMyPage();
-      return;
-    }
-    var affSave = e.target.closest("[data-mp-save-affiliate]");
-    if(affSave){
-      var savedAff = writeAffiliateSettings({
-        amazonTag: $("affAmazonTag") ? $("affAmazonTag").value : "",
-        rakutenId: $("affRakutenId") ? $("affRakutenId").value : ""
-      });
-      renderMyPage();
-      var fb = $("affSaveFeedback");
-      if(fb){
-        fb.hidden = false;
-        fb.textContent = (savedAff.amazonTag || savedAff.rakutenId)
-          ? "✓ 保存しました。好きな曲のプレビューに購入リンクが表示されます"
-          : "✓ 保存しました。IDが未設定のため、購入リンクは表示されません";
-      }
-      /* No need to refresh the editor preview here: renderPreview()
-         reads the affiliate settings on every render, so the next
-         time the editor (or its preview) is opened, the buy links
-         already follow the settings saved above. */
-      toast("アフィリエイト設定を保存しました");
       return;
     }
     var card = e.target.closest("[data-oshi-card]");
@@ -7853,6 +8032,103 @@
     var v = $(vid);
     if(v) v.addEventListener("click", handleMypageClick);
   });
+  /* ---------- 運営者ページの操作 ----------
+     アフィリエイト設定の保存（site_settings へ upsert）と、
+     お知らせの投稿・削除（notices テーブル）。削除は各お知らせ
+     の確認ボックスを経てから実行する。 */
+  function adminShowError(boxId, msg){
+    var box = $(boxId);
+    if(!box) return;
+    if(msg){ box.textContent = msg; box.hidden = false; }
+    else box.hidden = true;
+  }
+  function handleAdminClick(e){
+    var affSave = e.target.closest("[data-admin-save-affiliate]");
+    if(affSave){
+      adminShowError("adminAffError", "");
+      var fb = $("adminAffSaveFeedback");
+      if(fb) fb.hidden = true;
+      affSave.disabled = true;
+      sbSaveSiteAffiliate({
+        amazonTag: $("adminAffAmazonTag") ? $("adminAffAmazonTag").value : "",
+        rakutenId: $("adminAffRakutenId") ? $("adminAffRakutenId").value : ""
+      }).then(function(result){
+        affSave.disabled = false;
+        if(!result || !result.ok){
+          adminShowError("adminAffError", "保存に失敗しました。時間をおいてもう一度お試しください。");
+          return;
+        }
+        var aff = readAffiliateSettings();
+        if(fb){
+          fb.hidden = false;
+          fb.textContent = (aff.amazonTag || aff.rakutenId)
+            ? "✓ 保存しました。好きな曲のプレビューに購入リンクが表示されます"
+            : "✓ 保存しました。IDが未設定のため、購入リンクは表示されません";
+        }
+        if(typeof renderAlbumShelf === "function") renderAlbumShelf();
+        if(typeof renderAdSlots === "function") renderAdSlots();
+        toast("アフィリエイト設定を保存しました");
+      });
+      return;
+    }
+    var postBtn = e.target.closest("[data-admin-post-notice]");
+    if(postBtn){
+      var title = $("adminNoticeTitle") ? $("adminNoticeTitle").value.trim() : "";
+      var body = $("adminNoticeBody") ? $("adminNoticeBody").value.trim() : "";
+      if(!title){
+        adminShowError("adminNoticeError", "タイトルを入力してください。");
+        if($("adminNoticeTitle")) $("adminNoticeTitle").focus();
+        return;
+      }
+      adminShowError("adminNoticeError", "");
+      var nfb = $("adminNoticeFeedback");
+      if(nfb) nfb.hidden = true;
+      postBtn.disabled = true;
+      sbPostNotice(title, body).then(function(result){
+        postBtn.disabled = false;
+        if(!result || !result.ok){
+          adminShowError("adminNoticeError", "投稿に失敗しました。時間をおいてもう一度お試しください。");
+          return;
+        }
+        if($("adminNoticeTitle")) $("adminNoticeTitle").value = "";
+        if($("adminNoticeBody")) $("adminNoticeBody").value = "";
+        if(nfb){ nfb.hidden = false; nfb.textContent = "✓ 投稿しました"; }
+        renderAdminNotices();
+        toast("お知らせを投稿しました");
+      });
+      return;
+    }
+    var delBtn = e.target.closest("[data-admin-notice-delete]");
+    if(delBtn){
+      document.querySelectorAll("[data-admin-notice-confirm]").forEach(function(b){ b.hidden = true; });
+      var delId = delBtn.getAttribute("data-admin-notice-delete");
+      var delBox = document.querySelector('[data-admin-notice-confirm="' + delId + '"]');
+      if(delBox) delBox.hidden = false;
+      return;
+    }
+    var cancelBtn = e.target.closest("[data-admin-notice-delete-cancel]");
+    if(cancelBtn){
+      var cBox = cancelBtn.closest("[data-admin-notice-confirm]");
+      if(cBox) cBox.hidden = true;
+      return;
+    }
+    var confirmBtn = e.target.closest("[data-admin-notice-delete-confirm]");
+    if(confirmBtn){
+      var cid = confirmBtn.getAttribute("data-admin-notice-delete-confirm");
+      confirmBtn.disabled = true;
+      sbDeleteNotice(cid).then(function(result){
+        if(!result || !result.ok){
+          confirmBtn.disabled = false;
+          toast("削除に失敗しました。時間をおいてもう一度お試しください。");
+          return;
+        }
+        renderAdminNotices();
+        toast("お知らせを削除しました");
+      });
+      return;
+    }
+  }
+  if($("adminView")) $("adminView").addEventListener("click", handleAdminClick);
   /* STEP 1: design choice — the share page's (布教シート) design
      only. The profile editor's STEP 1 design (state.design) is
      chosen independently and is NOT changed here. */
@@ -8612,6 +8888,10 @@
   buildSns();
   buildTags();
   syncAuthUI();
+  /* サーバーのアフィリエイト設定（site_settings）を読み込む。
+     取得できたら serverAffiliateSettings に保持され、以降の
+     アフィリエイト表示はそちらを優先する。 */
+  sbFetchSiteAffiliate();
   loadProfile();
   loadShareState();
   renderSongSlots();
