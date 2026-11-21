@@ -11,16 +11,17 @@
 <meta property="og:site_name" content="#推しLink" />
 <meta property="og:title" content="推しLink ― あなたが知ってる推しの魅力。" />
 <meta property="og:description" content="好きなところを、あなたの言葉で。まだ知らない誰かに、推しの魅力を届けよう。 #推しLink" />
-<meta property="og:image" content="https://maru06saya-boop.github.io/oshilink/IMG_9617.jpeg" />
-<meta property="og:url" content="https://maru06saya-boop.github.io/oshilink/" />
+<meta property="og:image" content="https://oshilink-official.github.io/oshilink/IMG_9617.jpeg" />
+<meta property="og:url" content="https://oshilink-official.github.io/oshilink/" />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="推しLink ― あなたが知ってる推しの魅力。" />
 <meta name="twitter:description" content="好きなところを、あなたの言葉で。まだ知らない誰かに、推しの魅力を届けよう。 #推しLink" />
-<meta name="twitter:image" content="https://maru06saya-boop.github.io/oshilink/IMG_9617.jpeg" />
+<meta name="twitter:image" content="https://oshilink-official.github.io/oshilink/IMG_9617.jpeg" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=M+PLUS+Rounded+1c:wght@400;500;700;800&family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   :root{
     --bg:#fbf9fa;
@@ -3112,7 +3113,7 @@
      passing the relative "?oshi=…" string to X / LINE makes it show
      up verbatim in the post, and it must never be copied or encoded
      into a QR code either. */
-  var SHARE_URL_BASE = "https://maru06saya-boop.github.io/oshilink/";
+  var SHARE_URL_BASE = "https://oshilink-official.github.io/oshilink/";
   function hasShareUrl(){
     return /^https?:\/\//i.test(String(SHARE_URL_BASE || "").trim());
   }
@@ -3147,8 +3148,8 @@
     setMeta('meta[name="twitter:description"]', "content", desc);
     /* og:image stays on the rights-safe shared image (IMG_9617.jpeg):
        an uploaded profile photo is a local data URL, not a public image URL. */
-    setMeta('meta[property="og:image"]', "content", "https://maru06saya-boop.github.io/oshilink/IMG_9617.jpeg");
-    setMeta('meta[name="twitter:image"]', "content", "https://maru06saya-boop.github.io/oshilink/IMG_9617.jpeg");
+    setMeta('meta[property="og:image"]', "content", "https://oshilink-official.github.io/oshilink/IMG_9617.jpeg");
+    setMeta('meta[name="twitter:image"]', "content", "https://oshilink-official.github.io/oshilink/IMG_9617.jpeg");
   }
   function copyTextToClipboard(text, doneMsg){
     function done(){ toast(doneMsg || "コピーしました"); }
@@ -3183,9 +3184,13 @@
   /* ---------- affiliate settings（好きな曲の購入リンク） ----------
      運営者（このページの持ち主）自身のアフィリエイトIDの受け皿。
      マイページの「アフィリエイト設定」で入力・保存し、この端末の
-     localStorage（"oshilink.affiliate.v1"）にだけ保持する。
-     プロフィールの保存データには含めないので、GitHub 等へ
-     引き継ぐときも ID はコードやデータに混ざらない。
+     localStorage（"oshilink.affiliate.v1"）に保持する。
+     プロフィールの保存データには含めない。
+     例外として、運営者の楽天アフィリエイトIDだけはコード側に
+     初期値（DEFAULT_RAKUTEN_ID）として組み込んである。端末に
+     設定が保存されていない訪問者にも、その ID の楽天リンクが
+     表示されるようにするためで、端末に設定が保存されている
+     場合はそちらが優先される。Amazon のタグに初期値は無い。
      通常の JavaScript + localStorage のみで実装している。
 
      表示ルール:
@@ -3200,9 +3205,17 @@
      リンクは表示のたびに現在の設定と曲情報から組み立てる
      （曲データ側には保存しない）。 */
   var AFFILIATE_STORAGE_KEY = "oshilink.affiliate.v1";
+  /* 運営者（サイトの持ち主）の楽天アフィリエイトIDをコード側の
+     初期値として組み込む。端末にアフィリエイト設定が保存されて
+     いない訪問者でも、この ID を使った「楽天で探す」リンクや
+     アルバム棚の楽天リンクが表示されるようにするためのもの。
+     端末に設定が保存されている場合は、そちらを優先する
+     （空欄で保存されていれば、その保存内容がそのまま有効になる）。
+     Amazon のタグは初期値を置かず、未設定のまま。 */
+  var DEFAULT_RAKUTEN_ID = "59c72c35.b54fae88.59c72c36.1c3c72be";
   function readAffiliateSettings(){
     var data = readStoredJson(AFFILIATE_STORAGE_KEY);
-    if(!data || typeof data !== "object") return { amazonTag:"", rakutenId:"" };
+    if(!data || typeof data !== "object") return { amazonTag:"", rakutenId:DEFAULT_RAKUTEN_ID };
     return {
       amazonTag: String(data.amazonTag || "").trim(),
       rakutenId: String(data.rakutenId || "").trim()
@@ -4746,29 +4759,52 @@
      top page, so the logo and every 戻る button land in the same
      state no matter which view was open. */
   /* ============================================================
-     アカウント登録・ログイン（Auth）
+     アカウント登録・ログイン（Auth）— Supabase 接続（フェーズ1）
      ------------------------------------------------------------
-     今は通常の JavaScript + localStorage だけで動く試作実装。
-     本公開時に Supabase 等の本物の認証へ差し替えられるよう、
-     画面側は下の Auth インターフェースだけを使う形にしてある:
+     認証は Supabase Auth（メールアドレス＋パスワード）に接続する。
+     画面側は下の Auth インターフェースだけを使う:
        Auth.register({displayName, userId, email, password})
+         → Promise<{ ok, error?, user?, needsConfirm? }>
        Auth.login(identifier, password, remember)
+         → Promise<{ ok, error?, user? }>
        Auth.logout() / Auth.currentUser() / Auth.isLoggedIn()
-     差し替え時はこのオブジェクトの中身（保存先と照合方法）を
-     サーバー認証の呼び出しに置き換えれば、ガードや画面の
-     呼び出し側は変更不要。
-     保存先（試作）:
-       - アカウント一覧: localStorage "oshilink.users.v1"
-         [{ id, userId, displayName, email, passHash, createdAt }]
-         ※ passHash は試作用の簡易ハッシュで、平文は保存しない。
-           本物の認証ではサーバー側で管理する。
-       - ログイン状態: 「保存する」ON のとき localStorage、
-         OFF のとき sessionStorage（ブラウザを閉じると消える）
-         "oshilink.auth.session.v1"
-         { accountId, loginAt, expiresAt, remember }
-         保存ONの有効期限は30日。切れたら再ログインを促す。
+     register / login は非同期（Promise）になった。currentUser()
+     など同期系は、Supabase のセッション取得後にキャッシュした
+     ユーザーを返す。ログイン状態は Supabase のセッション
+     （supabase-js が保持）で管理する。
+     表示名とユーザーIDは signUp 時にユーザーメタデータ
+     （display_name / user_id）として渡し、ログイン後に復元する。
+     新規登録で確認メールが有効な場合、登録直後はセッションが
+     無い（needsConfirm）ので、ログイン画面側で確認メールの
+     案内を出す。
+     Supabase の読み込み・接続に失敗した場合は、壊れないよう
+     従来の端末内モック認証（LocalAuth: localStorage のみ）に
+     フォールバックして動作を続ける。すべての Supabase 呼び
+     出しは try/catch で包み、失敗してもエラー画面やアラート
+     は出さない。
+     プロフィールのサーバー保存（profiles テーブル）も同じ
+     方針: ログイン中の「保存する」で端末内保存に加えて
+     upsert し、ログイン時にサーバー分を取得してマイページ
+     一覧へ統合する。未ログイン時は端末内保存のみ。
      ============================================================ */
-  var Auth = (function(){
+  var Sb = (function(){
+    var SUPABASE_URL = "https://wpynmswmganafkzfajsw.supabase.co";
+    var SUPABASE_PUBLISHABLE_KEY = "sb_publishable_pzLbobFKeBqKlr7QVpSUQw_r1rexvNM";
+    var client = null;
+    try {
+      if(window.supabase && typeof window.supabase.createClient === "function"){
+        client = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      }
+    } catch(e){ client = null; }
+    return {
+      client: client,
+      available: function(){ return !!client; }
+    };
+  })();
+  /* 従来の端末内モック認証。Supabase が使えない環境での
+     フォールバックとして残してある（保存先は localStorage
+     "oshilink.users.v1" / "oshilink.auth.session.v1"）。 */
+  var LocalAuth = (function(){
     var USERS_KEY = "oshilink.users.v1";
     var SESSION_KEY = "oshilink.auth.session.v1";
     var SESSION_TTL = 30 * 24 * 60 * 60 * 1000;
@@ -4904,6 +4940,248 @@
       takeExpiredNotice: function(){ var v = expiredNotice; expiredNotice = false; return v; }
     };
   })();
+  /* ---------- Supabase Auth 本体 ----------
+     sbSessionUser は Supabase のセッションから復元した
+     ログイン中ユーザー（{ id, userId, displayName, email }）。
+     getSession / onAuthStateChange で常に最新に保つ。 */
+  var sbSessionUser = null;
+  function sbUserFromSupabase(u){
+    if(!u || typeof u !== "object") return null;
+    var md = (u.user_metadata && typeof u.user_metadata === "object") ? u.user_metadata : {};
+    var email = String(u.email || "");
+    return {
+      id: String(u.id || ""),
+      userId: String(md.user_id || md.username || ""),
+      displayName: String(md.display_name || md.name || "") || (email ? email.split("@")[0] : "ユーザー"),
+      email: email,
+      _sb: true
+    };
+  }
+  function sbAuthErrorText(err){
+    var msg = err && err.message ? String(err.message) : "";
+    if(/invalid login credentials/i.test(msg)) return "メールアドレスまたはパスワードが違います。";
+    if(/email not confirmed/i.test(msg)) return "メールアドレスの確認が完了していません。確認メール内のリンクを開いてからログインしてください。";
+    if(/already registered|already been registered|user already exists/i.test(msg)) return "そのメールアドレスはすでに登録されています。ログイン画面からログインしてください。";
+    if(/password should be at least/i.test(msg)) return "パスワードは8文字以上で設定してください。";
+    if(/unable to validate email|invalid email/i.test(msg)) return "メールアドレスの形式を確認してください。";
+    if(/rate limit|too many requests/i.test(msg)) return "短い時間に試行が集中しています。少し時間をおいてもう一度お試しください。";
+    return "通信に失敗しました。時間をおいてもう一度お試しください。";
+  }
+  function sbRegister(input){
+    var displayName = String(input.displayName || "").trim();
+    var email = String(input.email || "").trim();
+    var password = String(input.password || "");
+    var password2 = String(input.password2 || "");
+    if(!displayName) return Promise.resolve({ ok:false, error:"表示名を入力してください。" });
+    var idCheck = LocalAuth.checkUserId(input.userId);
+    if(!idCheck.ok) return Promise.resolve({ ok:false, error:idCheck.error });
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return Promise.resolve({ ok:false, error:"メールアドレスの形式を確認してください。" });
+    if(password.length < 8) return Promise.resolve({ ok:false, error:"パスワードは8文字以上で設定してください。" });
+    if(password !== password2) return Promise.resolve({ ok:false, error:"確認用パスワードが一致しません。" });
+    var userId = idCheck.normalized;
+    try {
+      return Sb.client.auth.signUp({
+        email: email,
+        password: password,
+        options: { data: { display_name: displayName, user_id: userId } }
+      }).then(function(res){
+        if(res && res.error) return { ok:false, error: sbAuthErrorText(res.error) };
+        var user = res && res.data ? res.data.user : null;
+        var session = res && res.data ? res.data.session : null;
+        if(session && user){
+          sbSessionUser = sbUserFromSupabase(user);
+          return { ok:true, user: sbSessionUser };
+        }
+        /* セッションが無い = 確認メール待ち。ログイン画面側で案内する。 */
+        return { ok:true, needsConfirm:true, user: user ? sbUserFromSupabase(user) : null };
+      }).catch(function(){
+        return { ok:false, error:"通信に失敗しました。時間をおいてもう一度お試しください。" };
+      });
+    } catch(e){
+      return Promise.resolve({ ok:false, error:"通信に失敗しました。時間をおいてもう一度お試しください。" });
+    }
+  }
+  function sbLogin(identifier, password, remember){
+    var idf = String(identifier || "").trim();
+    if(!idf) return Promise.resolve({ ok:false, error:"メールアドレスまたはユーザーIDを入力してください。" });
+    if(!String(password || "")) return Promise.resolve({ ok:false, error:"パスワードを入力してください。" });
+    if(idf.indexOf("@") < 0) return Promise.resolve({ ok:false, error:"ログインには、登録したメールアドレスを入力してください。" });
+    try {
+      return Sb.client.auth.signInWithPassword({ email: idf, password: String(password) }).then(function(res){
+        if(res && res.error) return { ok:false, error: sbAuthErrorText(res.error) };
+        sbSessionUser = (res && res.data && res.data.user) ? sbUserFromSupabase(res.data.user) : null;
+        return { ok:true, user: sbSessionUser };
+      }).catch(function(){
+        return { ok:false, error:"通信に失敗しました。時間をおいてもう一度お試しください。" };
+      });
+    } catch(e){
+      return Promise.resolve({ ok:false, error:"通信に失敗しました。時間をおいてもう一度お試しください。" });
+    }
+  }
+  function sbHasStoredSession(){
+    try {
+      for(var i = 0; i < window.localStorage.length; i++){
+        var k = window.localStorage.key(i);
+        if(k && k.indexOf("sb-") === 0 && k.indexOf("auth-token") >= 0) return true;
+      }
+    } catch(e){}
+    return false;
+  }
+  var Auth = {
+    register: function(input){
+      if(Sb.available()){
+        try { return sbRegister(input); } catch(e){}
+      }
+      return Promise.resolve(LocalAuth.register(input));
+    },
+    login: function(identifier, password, remember){
+      if(Sb.available()){
+        try { return sbLogin(identifier, password, remember); } catch(e){}
+      }
+      return Promise.resolve(LocalAuth.login(identifier, password, remember));
+    },
+    logout: function(){
+      if(Sb.available()){
+        try {
+          var p = Sb.client.auth.signOut();
+          if(p && typeof p.catch === "function") p.catch(function(){});
+        } catch(e){}
+        sbSessionUser = null;
+      }
+      try { LocalAuth.logout(); } catch(e){}
+    },
+    currentUser: function(){
+      if(Sb.available()) return sbSessionUser;
+      return LocalAuth.currentUser();
+    },
+    isLoggedIn: function(){ return !!Auth.currentUser(); },
+    hasAnyUser: function(){
+      if(sbSessionUser || sbHasStoredSession()) return true;
+      try { return LocalAuth.hasAnyUser(); } catch(e){ return false; }
+    },
+    normalizeUserId: LocalAuth.normalizeUserId,
+    checkUserId: LocalAuth.checkUserId,
+    takeExpiredNotice: function(){
+      try { return LocalAuth.takeExpiredNotice(); } catch(e){ return false; }
+    }
+  };
+  /* ---------- profiles テーブル連携 ----------
+     slug: そのプロフィールのユーザーID（アカウントのユーザー
+     ID）。未設定のときはプロフィールIDから生成した文字列
+     （サーバー由来のエントリは "sb-<slug>" というIDで端末内に
+     統合されるので、そこから slug を復元する）。 */
+  function sbSlugForEntry(entry){
+    if(!entry) return "";
+    if(entry.id && String(entry.id).indexOf("sb-") === 0) return String(entry.id).slice(3);
+    var d = entry.data || {};
+    var fromData = (d && typeof d.userId === "string") ? String(d.userId).trim() : "";
+    var user = null;
+    try { user = Auth.currentUser(); } catch(e){}
+    var uid = fromData || (user && user.userId ? String(user.userId) : "");
+    uid = uid.trim().replace(/^@+/, "").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    if(uid) return uid;
+    return String(entry.id || "").replace(/[^a-zA-Z0-9_-]/g, "");
+  }
+  function sbSaveProfile(entry){
+    try {
+      if(!Sb.available() || !entry) return;
+      var user = Auth.currentUser();
+      if(!user || !user._sb || !user.id) return;
+      var slug = sbSlugForEntry(entry);
+      if(!slug) return;
+      var d = entry.data || {};
+      var row = {
+        slug: slug,
+        name: (typeof entryName === "function") ? entryName(d) : "",
+        genre: d.fields ? String(d.fields["f-genre"] || "") : "",
+        visibility: (typeof normalizeVisibility === "function") ? normalizeVisibility(d.visibility) : "private",
+        data: d,
+        owner_id: user.id
+      };
+      Sb.client.from("profiles").select("id").eq("owner_id", user.id).eq("slug", slug).limit(1)
+        .then(function(res){
+          if(res && !res.error && res.data && res.data.length){
+            return Sb.client.from("profiles").update(row).eq("id", res.data[0].id);
+          }
+          return Sb.client.from("profiles").insert(row);
+        })
+        .then(function(){ /* 保存の成否で画面は止めない（端末内保存が正） */ })
+        .catch(function(){});
+    } catch(e){ /* Supabase 失敗時も端末内保存だけで続行 */ }
+  }
+  function sbDeleteProfile(entry){
+    try {
+      if(!Sb.available() || !entry) return;
+      var user = Auth.currentUser();
+      if(!user || !user._sb || !user.id) return;
+      var slug = sbSlugForEntry(entry);
+      if(!slug) return;
+      Sb.client.from("profiles").delete().eq("owner_id", user.id).eq("slug", slug)
+        .then(function(){})
+        .catch(function(){});
+    } catch(e){ /* 端末内削除だけで続行 */ }
+  }
+  /* ログイン時: サーバー上の自分のプロフィールを取得して、
+     端末内のリストへ統合する。端末内にだけあるものはそのまま
+     残し、同じ slug のものはサーバー側が新しければサーバーの
+     内容で更新する。サーバーにだけあるものは "sb-<slug>" の
+     IDで端末内リストへ取り込む（既存の編集・削除フローが
+     そのまま使える）。 */
+  function sbFetchAndMergeProfiles(){
+    try {
+      if(!Sb.available()) return;
+      var user = Auth.currentUser();
+      if(!user || !user._sb || !user.id) return;
+      Sb.client.from("profiles").select("*").eq("owner_id", user.id)
+        .then(function(res){
+          if(!res || res.error || !Array.isArray(res.data)) return;
+          var local = readProfiles();
+          var changed = false;
+          res.data.forEach(function(row){
+            if(!row || !row.data || typeof row.data !== "object") return;
+            var slug = row.slug ? String(row.slug) : "";
+            if(!slug) return;
+            var rowTime = row.updated_at ? (Date.parse(row.updated_at) || 0) : 0;
+            var match = null;
+            local.forEach(function(en){ if(!match && sbSlugForEntry(en) === slug) match = en; });
+            if(match){
+              if(rowTime && rowTime > (match.updatedAt || 0)){
+                match.data = row.data;
+                match.updatedAt = rowTime;
+                changed = true;
+              }
+              return;
+            }
+            var nid = "sb-" + slug.replace(/[^a-zA-Z0-9_-]/g, "");
+            var exists = false;
+            local.forEach(function(en){ if(en.id === nid) exists = true; });
+            if(exists) return;
+            local.push({ id: nid, updatedAt: rowTime || Date.now(), data: row.data });
+            changed = true;
+          });
+          if(changed) writeProfiles(local);
+          if(typeof renderMyPage === "function") renderMyPage();
+        })
+        .catch(function(){});
+    } catch(e){ /* 取得できなくても端末内の一覧だけで続行 */ }
+  }
+  /* 起動時: Supabase のセッションを復元して UI と一覧へ反映 */
+  (function sbInitAuth(){
+    if(!Sb.available()) return;
+    try {
+      Sb.client.auth.getSession().then(function(res){
+        var session = (res && res.data) ? res.data.session : null;
+        sbSessionUser = session ? sbUserFromSupabase(session.user) : null;
+        if(typeof syncAuthUI === "function") syncAuthUI();
+        if(sbSessionUser) sbFetchAndMergeProfiles();
+      }).catch(function(){});
+      Sb.client.auth.onAuthStateChange(function(event, session){
+        sbSessionUser = session ? sbUserFromSupabase(session.user) : null;
+        if(typeof syncAuthUI === "function") syncAuthUI();
+        if(event === "SIGNED_IN" && sbSessionUser) sbFetchAndMergeProfiles();
+      });
+    } catch(e){ /* セッション復元に失敗しても通常表示で続行 */ }
+  })();
   function authIsLoggedIn(){ return Auth.isLoggedIn(); }
   var pendingAuthAction = null;
   var authMode = "login";
@@ -4950,13 +5228,15 @@
     var info = $("menuAccountInfo");
     if(info){
       info.hidden = !loggedIn;
-      if(loggedIn) info.innerHTML = "<b>" + esc(user.displayName) + "</b>@" + esc(user.userId) + " でログイン中";
+      if(loggedIn) info.innerHTML = user.userId
+        ? "<b>" + esc(user.displayName) + "</b>@" + esc(user.userId) + " でログイン中"
+        : "<b>" + esc(user.displayName) + "</b> でログイン中";
     }
     if(loggedIn){
       if($("mpAccountAva")) $("mpAccountAva").textContent = (user.displayName || "?").slice(0, 1);
       if($("mpAccountName")) $("mpAccountName").textContent = user.displayName;
-      if($("mpAccountMeta")) $("mpAccountMeta").textContent = "@" + user.userId + " ／ " + user.email;
-      if($("mpAccountUrl")) $("mpAccountUrl").textContent = "推しLink/@" + user.userId;
+      if($("mpAccountMeta")) $("mpAccountMeta").textContent = user.userId ? ("@" + user.userId + " ／ " + user.email) : user.email;
+      if($("mpAccountUrl")) $("mpAccountUrl").textContent = user.userId ? ("推しLink/@" + user.userId) : "推しLink/@ ―――";
     } else {
       if($("mpAccountAva")) $("mpAccountAva").textContent = "?";
       if($("mpAccountName")) $("mpAccountName").textContent = "ゲスト（未ログイン）";
@@ -5054,30 +5334,48 @@
   }
   if($("loginForm")) $("loginForm").addEventListener("submit", function(e){
     e.preventDefault();
-    var result = Auth.login($("login-id").value, $("login-password").value, $("login-remember").checked);
-    if(!result.ok){ authShowError(result.error); return; }
-    authShowError("");
-    syncAuthUI();
-    toast("ログインしました");
-    runPendingAuthAction();
+    Promise.resolve(Auth.login($("login-id").value, $("login-password").value, $("login-remember").checked)).then(function(result){
+      if(!result || !result.ok){ authShowError(result && result.error ? result.error : "ログインに失敗しました。時間をおいてもう一度お試しください。"); return; }
+      authShowError("");
+      syncAuthUI();
+      toast("ログインしました");
+      sbFetchAndMergeProfiles();
+      runPendingAuthAction();
+    }).catch(function(){ authShowError("ログインに失敗しました。時間をおいてもう一度お試しください。"); });
   });
   if($("registerForm")) $("registerForm").addEventListener("submit", function(e){
     e.preventDefault();
     var idCheck = validateRegUserid(true);
     if(!idCheck.ok){ authShowError(idCheck.error); if($("reg-userid")) $("reg-userid").focus(); return; }
-    var result = Auth.register({
+    Promise.resolve(Auth.register({
       displayName: $("reg-name").value,
       userId: $("reg-userid").value,
       email: $("reg-email").value,
       password: $("reg-password").value,
       password2: $("reg-password2").value,
       remember: $("reg-remember").checked
-    });
-    if(!result.ok){ authShowError(result.error); return; }
-    authShowError("");
-    syncAuthUI();
-    toast("アカウントを作成しました");
-    runPendingAuthAction();
+    })).then(function(result){
+      if(!result || !result.ok){ authShowError(result && result.error ? result.error : "登録に失敗しました。時間をおいてもう一度お試しください。"); return; }
+      authShowError("");
+      if(result.needsConfirm){
+        /* 確認メール方式: セッションがまだ無いので、ログイン
+           画面側へ切り替えて確認メールの案内を出す。 */
+        setAuthMode("login");
+        setAuthStep("form");
+        var note = $("authPendingNote");
+        if(note){
+          note.textContent = "確認メールを送りました。メール内のリンクを開いて登録を完了してから、ログインしてください。";
+          note.hidden = false;
+        }
+        toast("確認メールを送りました");
+        window.scrollTo(0, 0);
+        return;
+      }
+      syncAuthUI();
+      toast("アカウントを作成しました");
+      sbFetchAndMergeProfiles();
+      runPendingAuthAction();
+    }).catch(function(){ authShowError("登録に失敗しました。時間をおいてもう一度お試しください。"); });
   });
   if($("menuLogin")) $("menuLogin").addEventListener("click", function(){ pendingAuthAction = null; pendingAuthLabel = ""; showAuthView("login"); });
   if($("menuRegister")) $("menuRegister").addEventListener("click", function(){ pendingAuthAction = null; pendingAuthLabel = ""; showAuthView("register"); });
@@ -5197,6 +5495,9 @@
     before.forEach(function(en){ if(en.id === id) deletedEntry = en; });
     var arr = before.filter(function(en){ return en.id !== id; });
     writeProfiles(arr);
+    /* ログイン中はサーバー側の行も削除する（失敗しても端末内の
+       削除だけで動作を続ける）。 */
+    if(deletedEntry){ try { sbDeleteProfile(deletedEntry); } catch(e){} }
     var map = readStoredJson(SHARES_MAP_KEY);
     var deletedShare = (map && typeof map === "object") ? map[id] : null;
     if(map && typeof map === "object" && map[id]){
@@ -6824,6 +7125,9 @@
        photos) live in writeProfiles(). */
     upsertProfile(data);
     try { window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(data)); } catch(e){}
+    /* ログイン中は Supabase の profiles テーブルにも保存する
+       （失敗しても端末内保存だけで動作を続ける）。 */
+    try { sbSaveProfile({ id: currentEditingId, updatedAt: Date.now(), data: data }); } catch(e){}
   }
   /* ---------- editor draft (work in progress) ----------
      Auto-save writes the draft, not the saved profile. The draft
