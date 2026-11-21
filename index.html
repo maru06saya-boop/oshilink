@@ -5281,6 +5281,131 @@
     if(uid) return uid;
     return String(entry.id || "").replace(/[^a-zA-Z0-9_-]/g, "");
   }
+  /* ---------- プロフィール画像の Supabase Storage 化 ----------
+     ログイン中にプロフィールをサーバー保存するとき、データ内に
+     埋め込まれた data:image/ 形式の画像（プロフィール画像・
+     推し活記録の写真・グッズの商品画像など）は Storage バケット
+     "profile-images"（パス: <ユーザーID>/<ランダム>.<拡張子>）へ
+     アップロードし、公開URLへ置き換えてから保存する。既に
+     http(s) URL の画像はそのまま。アップロードに失敗した画像は
+     元の data URL のまま残し、保存自体は失敗させない。 */
+  var SB_IMAGE_BUCKET = "profile-images";
+  function sbImageExt(mime){
+    var m = String(mime || "").toLowerCase();
+    if(m === "image/jpeg") return "jpg";
+    if(m === "image/png") return "png";
+    if(m === "image/webp") return "webp";
+    if(m === "image/gif") return "gif";
+    var sub = m.replace(/^image\//, "").replace(/[^a-z0-9]/g, "");
+    return sub || "bin";
+  }
+  function sbDataUrlToBlob(dataUrl){
+    try {
+      var comma = dataUrl.indexOf(",");
+      if(comma < 0) return null;
+      var header = dataUrl.slice(0, comma);
+      var mimeMatch = header.match(/^data:([^;]+)/i);
+      var mime = mimeMatch ? mimeMatch[1] : "application/octet-stream";
+      var bin = atob(dataUrl.slice(comma + 1));
+      var bytes = new Uint8Array(bin.length);
+      for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return { blob: new Blob([bytes], { type: mime }), mime: mime };
+    } catch(e){ return null; }
+  }
+  function sbRandomImageId(){
+    try {
+      if(window.crypto && typeof window.crypto.randomUUID === "function") return window.crypto.randomUUID();
+    } catch(e){}
+    return Date.now().toString(36) + "-" + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  }
+  /* data URL の画像を1枚アップロードし、公開URLを返す。
+     失敗したら null（呼び出し側は元の値をそのまま残す）。 */
+  function sbUploadDataImage(dataUrl, userId){
+    try {
+      if(!Sb.available() || !userId) return Promise.resolve(null);
+      var parsed = sbDataUrlToBlob(dataUrl);
+      if(!parsed) return Promise.resolve(null);
+      var path = String(userId) + "/" + sbRandomImageId() + "." + sbImageExt(parsed.mime);
+      return Sb.client.storage.from(SB_IMAGE_BUCKET).upload(path, parsed.blob, { contentType: parsed.mime, upsert: false })
+        .then(function(res){
+          if(res && res.error) return null;
+          var pub = Sb.client.storage.from(SB_IMAGE_BUCKET).getPublicUrl(path);
+          var url = (pub && pub.data) ? String(pub.data.publicUrl || "") : "";
+          return url || null;
+        })
+        .catch(function(){ return null; });
+    } catch(e){ return Promise.resolve(null); }
+  }
+  /* データ構造を深くたどり、data:image/ の文字列だけをアップ
+     ロード済みURLへ置き換えた複製を返す（元の値は壊さない）。 */
+  function sbTransformDataImages(value, userId){
+    if(typeof value === "string"){
+      if(value.indexOf("data:image/") === 0){
+        return sbUploadDataImage(value, userId).then(function(url){ return url || value; });
+      }
+      return Promise.resolve(value);
+    }
+    if(Array.isArray(value)){
+      return Promise.all(value.map(function(v){ return sbTransformDataImages(v, userId); }));
+    }
+    if(value && typeof value === "object"){
+      var keys = Object.keys(value);
+      var out = {};
+      return Promise.all(keys.map(function(k){
+        return sbTransformDataImages(value[k], userId).then(function(nv){ out[k] = nv; });
+      })).then(function(){ return out; });
+    }
+    return Promise.resolve(value);
+  }
+  /* 端末内の保存データへ、アップロードで得たURLだけを反映する
+     （画像以外の値は一切触らない）。 */
+  function sbMergeImageUrls(local, uploaded){
+    if(typeof local === "string"){
+      if(local.indexOf("data:image/") === 0 && typeof uploaded === "string" && /^https?:\/\//i.test(uploaded)) return uploaded;
+      return local;
+    }
+    if(Array.isArray(local) && Array.isArray(uploaded)){
+      return local.map(function(v, i){ return sbMergeImageUrls(v, uploaded[i]); });
+    }
+    if(local && uploaded && typeof local === "object" && typeof uploaded === "object"){
+      var out = {};
+      Object.keys(local).forEach(function(k){ out[k] = sbMergeImageUrls(local[k], uploaded[k]); });
+      return out;
+    }
+    return local;
+  }
+  function sbReflectUploadedImages(entryId, uploadedData){
+    try {
+      if(!entryId) return;
+      var arr = readProfiles();
+      var changed = false;
+      arr.forEach(function(en){
+        if(en && en.id === entryId && en.data){
+          var merged = sbMergeImageUrls(en.data, uploadedData);
+          if(JSON.stringify(merged) !== JSON.stringify(en.data)){ en.data = merged; changed = true; }
+        }
+      });
+      if(changed) writeProfiles(arr);
+    } catch(e){}
+  }
+  /* データ内にある当バケットの公開URLから、Storage 上のパスを
+     集める（プロフィール削除時に画像も消すために使う）。 */
+  function sbCollectBucketPaths(value, out){
+    if(typeof value === "string"){
+      var marker = "/storage/v1/object/public/" + SB_IMAGE_BUCKET + "/";
+      var idx = value.indexOf(marker);
+      if(idx >= 0){
+        var p = value.slice(idx + marker.length).split(/[?#]/)[0];
+        try { p = decodeURIComponent(p); } catch(e){}
+        if(p && out.indexOf(p) < 0) out.push(p);
+      }
+      return;
+    }
+    if(Array.isArray(value)){ value.forEach(function(v){ sbCollectBucketPaths(v, out); }); return; }
+    if(value && typeof value === "object"){
+      Object.keys(value).forEach(function(k){ sbCollectBucketPaths(value[k], out); });
+    }
+  }
   function sbSaveProfile(entry){
     try {
       if(!Sb.available() || !entry) return;
@@ -5288,7 +5413,7 @@
       if(!user || !user._sb || !user.id) return;
       var slug = sbSlugForEntry(entry);
       if(!slug) return;
-      var d = entry.data || {};
+      var proceed = function(d){
       var row = {
         slug: slug,
         name: (typeof entryName === "function") ? entryName(d) : "",
@@ -5331,6 +5456,16 @@
           doSave();
         })
         .catch(function(){ doSave(); });
+      };
+      /* 画像を Storage へ移してから保存する。置き換えたURLは
+         端末内の保存データにも反映する。変換処理で問題が起きても
+         元データのまま保存を試みる。 */
+      sbTransformDataImages(entry.data || {}, user.id)
+        .then(function(uploaded){
+          try { sbReflectUploadedImages(entry.id, uploaded); } catch(e){}
+          proceed(uploaded);
+        })
+        .catch(function(){ proceed(entry.data || {}); });
     } catch(e){ /* Supabase 失敗時も端末内保存だけで続行 */ }
   }
   function sbDeleteProfile(entry){
@@ -5340,6 +5475,21 @@
       if(!user || !user._sb || !user.id) return;
       var slug = sbSlugForEntry(entry);
       if(!slug) return;
+      /* このプロフィールで使っていた Storage 画像（プロフィール
+         本体＋布教シートの写真）も消すよう試みる。失敗しても
+         削除処理自体は続ける。 */
+      try {
+        var paths = [];
+        sbCollectBucketPaths(entry.data || {}, paths);
+        var mapKey = (typeof SHARES_MAP_KEY !== "undefined") ? SHARES_MAP_KEY : "oshilink.shares.v2";
+        var shareMap = (typeof readStoredJson === "function") ? readStoredJson(mapKey) : null;
+        if(shareMap && typeof shareMap === "object" && entry.id && shareMap[entry.id]) sbCollectBucketPaths(shareMap[entry.id], paths);
+        if(paths.length){
+          Sb.client.storage.from(SB_IMAGE_BUCKET).remove(paths)
+            .then(function(){})
+            .catch(function(){});
+        }
+      } catch(e){}
       Sb.client.from("profiles").delete().eq("owner_id", user.id).eq("slug", slug)
         .then(function(){})
         .catch(function(){});
@@ -8195,6 +8345,38 @@
       map[currentEditingId] = data;
       try { window.localStorage.setItem(SHARES_MAP_KEY, JSON.stringify(map)); } catch(e){}
     }
+    /* ログイン中は、布教シートの写真も Supabase Storage へ移し、
+       保存値を公開URLへ差し替える（未ログイン時は従来通り端末内
+       保存のみ）。アップロードに失敗したら元の data URL のまま
+       にして、保存自体は失敗させない。 */
+    try {
+      if(saved && data.img && data.img.indexOf("data:image/") === 0 && typeof Sb !== "undefined" && Sb.available() && typeof sbUploadDataImage === "function"){
+        var sbUser = null;
+        try { sbUser = Auth.currentUser(); } catch(e){}
+        if(sbUser && sbUser._sb && sbUser.id){
+          var originalImg = data.img;
+          var sheetProfileId = currentEditingId;
+          sbUploadDataImage(originalImg, sbUser.id).then(function(url){
+            if(!url) return;
+            try {
+              if(spState.img === originalImg) spState.img = url;
+              var cur = readStoredJson(SHARE_STORAGE_KEY);
+              if(cur && cur.img === originalImg){
+                cur.img = url;
+                try { window.localStorage.setItem(SHARE_STORAGE_KEY, JSON.stringify(cur)); } catch(e){}
+              }
+              if(sheetProfileId){
+                var m2 = readStoredJson(SHARES_MAP_KEY) || {};
+                if(m2[sheetProfileId] && m2[sheetProfileId].img === originalImg){
+                  m2[sheetProfileId].img = url;
+                  try { window.localStorage.setItem(SHARES_MAP_KEY, JSON.stringify(m2)); } catch(e){}
+                }
+              }
+            } catch(e){}
+          }).catch(function(){});
+        }
+      }
+    } catch(e){}
   }
   function applyShareData(data){
     if(!data || typeof data !== "object") return;
