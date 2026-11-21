@@ -302,7 +302,7 @@
      edited thumbnail (mini preview) on the right */
   .oshi-detail-flex{display:flex; gap:12px; align-items:flex-start}
   .oshi-detail-main{flex:1; min-width:0}
-  .oshi-sheet-preview{flex:none; width:min(47%,210px)}
+  .oshi-sheet-preview{flex:none; width:min(47%,210px); align-self:center}
   .oshi-sheet-preview .og-thumb{width:100%; box-shadow:inset 0 0 0 1px rgba(58,16,38,.12), 0 4px 12px rgba(62,20,42,.10)}
   /* always-visible note next to the profile image pickers */
   .img-note{margin:8px 0 0; font-size:12px; font-weight:700; color:var(--pink); line-height:1.5}
@@ -1681,43 +1681,31 @@
     </div>
   </section>
   <section class="fcard mypage-sec" aria-label="推しプロフィールの管理">
-    <button type="button" class="mypage-toggle" data-mp-toggle="profiles" aria-expanded="false" aria-controls="mypageProfilesBody">
+    <button type="button" class="mypage-toggle" data-mp-nav="profiles">
       <span class="mypage-toggle-main">
         <span class="mypage-toggle-title">推しプロフィールの管理</span>
         <span class="mypage-toggle-desc">この端末に保存された推しプロフィールです。編集へ進んだり、削除したりできます。</span>
       </span>
       <span class="mypage-toggle-side"><span class="mypage-count" id="mypageProfilesCount" hidden></span><span class="mypage-chevron" aria-hidden="true">›</span></span>
     </button>
-    <div class="mypage-body" id="mypageProfilesBody" hidden>
-      <div id="mypageProfileList"></div>
-      <div id="mypageProfileDetail"></div>
-    </div>
   </section>
   <section class="fcard mypage-sec" aria-label="布教シートの管理">
-    <button type="button" class="mypage-toggle" data-mp-toggle="sheets" aria-expanded="false" aria-controls="mypageSheetsBody">
+    <button type="button" class="mypage-toggle" data-mp-nav="sheets">
       <span class="mypage-toggle-main">
         <span class="mypage-toggle-title">布教シートの管理</span>
         <span class="mypage-toggle-desc">保存された布教シート（共有ページ）の内容です。共有ページへ進んで確認・共有したり、削除したりできます。</span>
       </span>
       <span class="mypage-toggle-side"><span class="mypage-count" id="mypageSheetsCount" hidden></span><span class="mypage-chevron" aria-hidden="true">›</span></span>
     </button>
-    <div class="mypage-body" id="mypageSheetsBody" hidden>
-      <div id="mypageSheetList"></div>
-      <div id="mypageSheetDetail"></div>
-    </div>
   </section>
   <section class="fcard mypage-sec" id="mypageFavsSection" aria-label="お気に入りにした推しプロフィール">
-    <button type="button" class="mypage-toggle" data-mp-toggle="favs" aria-expanded="false" aria-controls="mypageFavsBody">
+    <button type="button" class="mypage-toggle" data-mp-nav="favs">
       <span class="mypage-toggle-main">
         <span class="mypage-toggle-title">お気に入りにした推しプロフィール</span>
         <span class="mypage-toggle-desc">お気に入りした公開プロフィールがここに表示されます。</span>
       </span>
       <span class="mypage-toggle-side"><span class="mypage-count" id="mypageFavsCount" hidden></span><span class="mypage-chevron" aria-hidden="true">›</span></span>
     </button>
-    <div class="mypage-body" id="mypageFavsBody" hidden>
-      <div id="mypageFavList"></div>
-      <div id="mypageFavDetail"></div>
-    </div>
   </section>
   <section class="fcard mypage-sec" aria-label="アフィリエイト設定">
     <button type="button" class="mypage-toggle" data-mp-toggle="affiliate" aria-expanded="false" aria-controls="mypageAffiliateBody">
@@ -1743,6 +1731,39 @@
       <p class="aff-feedback" id="affSaveFeedback" role="status" aria-live="polite" hidden>✓ 保存しました</p>
       <p class="aff-note">片方だけの設定でも大丈夫です。設定したサービスのリンクだけが表示されます。リンクを表示したくないときは、空欄にして保存してください。IDはこの端末のブラウザにだけ保存され、プロフィールのデータには含まれません。</p>
     </div>
+  </section>
+</div>
+
+<div class="sub-wrap" id="mypageProfilesView" hidden>
+  <div class="ed-top">
+    <button type="button" class="btn-back" data-back-mypage>← もどる</button>
+    <h1>推しプロフィールの管理</h1>
+  </div>
+  <section class="fcard" aria-label="推しプロフィールの管理">
+    <div id="mypageProfileList"></div>
+    <div id="mypageProfileDetail"></div>
+  </section>
+</div>
+
+<div class="sub-wrap" id="mypageSheetsView" hidden>
+  <div class="ed-top">
+    <button type="button" class="btn-back" data-back-mypage>← もどる</button>
+    <h1>布教シートの管理</h1>
+  </div>
+  <section class="fcard" aria-label="布教シートの管理">
+    <div id="mypageSheetList"></div>
+    <div id="mypageSheetDetail"></div>
+  </section>
+</div>
+
+<div class="sub-wrap" id="mypageFavsView" hidden>
+  <div class="ed-top">
+    <button type="button" class="btn-back" data-back-mypage>← もどる</button>
+    <h1>お気に入りにした推しプロフィール</h1>
+  </div>
+  <section class="fcard" aria-label="お気に入りにした推しプロフィール">
+    <div id="mypageFavList"></div>
+    <div id="mypageFavDetail"></div>
   </section>
 </div>
 
@@ -5385,7 +5406,7 @@
   if($("btnLoginMypage")) $("btnLoginMypage").addEventListener("click", function(){ pendingAuthAction = null; pendingAuthLabel = ""; showAuthView("login"); });
 
   function hideSubViews(){
-    ["mypageView", "searchView", "searchResultsView", "searchProfileView", "termsView", "newsView", "faqView", "premiumView", "adsView", "privacyView", "contactView", "tokushoView", "authView"].forEach(function(id){
+    ["mypageView", "mypageProfilesView", "mypageSheetsView", "mypageFavsView", "searchView", "searchResultsView", "searchProfileView", "termsView", "newsView", "faqView", "premiumView", "adsView", "privacyView", "contactView", "tokushoView", "authView"].forEach(function(id){
       var el = $(id);
       if(el) el.hidden = true;
     });
@@ -5777,11 +5798,7 @@
     var favorites = readFavorites();
     var legacyShare = (typeof SHARE_STORAGE_KEY !== "undefined") ? readStoredJson(SHARE_STORAGE_KEY) : null;
     var shareMap = readStoredJson(SHARES_MAP_KEY) || {};
-    function paintSection(key, bodyId, countId, count){
-      var body = $(bodyId);
-      if(body) body.hidden = !mypageOpenSections[key];
-      var toggle = document.querySelector('[data-mp-toggle="' + key + '"]');
-      if(toggle) toggle.setAttribute("aria-expanded", String(!!mypageOpenSections[key]));
+    function paintCount(countId, count){
       var badge = $(countId);
       if(badge){
         if(count > 0){ badge.hidden = false; badge.textContent = count + "人"; }
@@ -5789,9 +5806,9 @@
       }
     }
     var hasLegacySheetOnly = !profiles.length && !!(legacyShare && legacyShare.fields && String(legacyShare.fields["sp-name"] || "").trim());
-    paintSection("profiles", "mypageProfilesBody", "mypageProfilesCount", profiles.length);
-    paintSection("sheets", "mypageSheetsBody", "mypageSheetsCount", profiles.length + (hasLegacySheetOnly ? 1 : 0));
-    paintSection("favs", "mypageFavsBody", "mypageFavsCount", favorites.length);
+    paintCount("mypageProfilesCount", profiles.length);
+    paintCount("mypageSheetsCount", profiles.length + (hasLegacySheetOnly ? 1 : 0));
+    paintCount("mypageFavsCount", favorites.length);
     /* affiliate settings section: no person-count badge — the
        badge instead shows 設定済み once either ID is saved.
        Inputs are refilled from the saved settings, except while
@@ -6624,6 +6641,11 @@
       }
     });
   }
+  var MYPAGE_SECTION_VIEWS = { profiles:"mypageProfilesView", sheets:"mypageSheetsView", favs:"mypageFavsView" };
+  function openMypageSection(key){
+    var vid = MYPAGE_SECTION_VIEWS[key];
+    if(vid) openSubView(vid);
+  }
   function openSubView(id){
     /* 作成中の段階ではマイページもログインガードなしで開ける。 */
     closeMenuPanel();
@@ -6632,7 +6654,7 @@
     $("editorView").hidden = true;
     if($("sharePageView")) $("sharePageView").hidden = true;
     $(id).hidden = false;
-    if(id === "mypageView") renderMyPage();
+    if(id === "mypageView" || id === "mypageProfilesView" || id === "mypageSheetsView" || id === "mypageFavsView") renderMyPage();
     if(id === "searchView") initSearch();
     window.scrollTo(0, 0);
   }
@@ -6655,17 +6677,9 @@
   if($("menuNews")) $("menuNews").addEventListener("click", function(){ openSubView("newsView"); });
   if($("menuFaq")) $("menuFaq").addEventListener("click", function(){ openSubView("faqView"); });
   if($("menuPremium")) $("menuPremium").addEventListener("click", function(){ openSubView("premiumView"); });
-  /* menu「お気に入り」: マイページを開いて、お気に入りセクションを
-     展開した状態でその場所までスクロールする。 */
+  /* menu「お気に入り」: お気に入りの専用画面を直接開く。 */
   function openMyPageFavorites(){
-    mypageOpenSections.favs = true;
-    openSubView("mypageView");
-    var sec = $("mypageFavsSection");
-    if(sec){
-      requestAnimationFrame(function(){
-        sec.scrollIntoView({ block:"start", behavior:"smooth" });
-      });
-    }
+    openSubView("mypageFavsView");
   }
   if($("menuFavorites")) $("menuFavorites").addEventListener("click", openMyPageFavorites);
   document.querySelectorAll("[data-legal-nav]").forEach(function(b){
@@ -6681,7 +6695,15 @@
   document.querySelectorAll("[data-back-home]").forEach(function(b){
     b.addEventListener("click", showHomeView);
   });
-  $("mypageView").addEventListener("click", function(e){
+  document.querySelectorAll("[data-back-mypage]").forEach(function(b){
+    b.addEventListener("click", function(){ openSubView("mypageView"); });
+  });
+  function handleMypageClick(e){
+    var nav = e.target.closest("[data-mp-nav]");
+    if(nav){
+      openMypageSection(nav.getAttribute("data-mp-nav"));
+      return;
+    }
     var toggle = e.target.closest("[data-mp-toggle]");
     if(toggle){
       var key = toggle.getAttribute("data-mp-toggle");
@@ -6782,6 +6804,11 @@
       toast("布教シートを削除しました");
       return;
     }
+  }
+  $("mypageView").addEventListener("click", handleMypageClick);
+  ["mypageProfilesView", "mypageSheetsView", "mypageFavsView"].forEach(function(vid){
+    var v = $(vid);
+    if(v) v.addEventListener("click", handleMypageClick);
   });
   /* STEP 1: design choice — the share page's (布教シート) design
      only. The profile editor's STEP 1 design (state.design) is
